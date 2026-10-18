@@ -76,10 +76,7 @@ EVENTS: list[tuple] = [
     ("2026-07-28", "maritime_attack", "Southern Red Sea", "RED_SEA", "YE-HOUTHI", None, None, 3, "UKMTO advisory 098-26 reported an explosion in the southern Red Sea.", P("UKMTO advisory 098-26", UKMTO098, "A2"), False),
     ("2026-08-12", "maritime_attack", "Bab al-Mandab", "RED_SEA", "YE-HOUTHI", "SA", None, 4, "Houthi strike on a Saudi vessel in Bab al-Mandab.", P("Wikipedia, 2026 Strait of Hormuz crisis", WIKI_HORMUZ), False),
     ("2026-08-31", "intercept", "UAE territorial waters", "AE", "AE", "IR", None, 3, "An Iranian drone was intercepted over UAE waters.", P("Khaleej Times, 15 Oct 2026", KT_AUG31, "B2"), False),
-    ("2026-10-02", "maritime_attack", "Off the UAE coast", "AE", "IR", None, None, 4, "Tanker attack reported off the UAE; Reuters cited at least one attack a day since 2 October.", P("Demo coding of Reuters via Wikipedia timeline", WIKI_HORMUZ, "C3"), True),
-    ("2026-10-03", "maritime_attack", "Off Qatar", "QA", "IR", None, None, 4, "Tanker attack reported off Qatar.", P("Demo coding of Reuters via Wikipedia timeline", WIKI_HORMUZ, "C3"), True),
     ("2026-10-05", "drone_strike", "Saudi airport (unspecified)", "SA", "YE-HOUTHI", "SA", None, 3, "First of the October airport attacks; five Saudi airports attacked since 5 October with 20 deaths by 14 October.", P("Shafaq and AFP via Ahram, 14 to 15 Oct 2026", AHRAM, "C3"), True),
-    ("2026-10-06", "maritime_attack", "Gulf of Oman", "OM", "IR", None, None, 3, "Tanker attack reported in the Gulf of Oman.", P("Demo coding of Reuters via Wikipedia timeline", WIKI_HORMUZ, "C3"), True),
     ("2026-10-10", "missile_strike", "King Khalid International Airport, Riyadh", "SA", "YE-HOUTHI", "SA", 13, 5, "Strike on Riyadh's King Khalid airport killed 12 to 13 people with more than 300 injured.", P("Khaleej Times, 11 Oct 2026", KT_RIYADH, "B1"), False),
     ("2026-10-13", "drone_strike", "Dammam airport and Dhahran", "SA", "YE-HOUTHI", "SA", None, 4, "Houthis claimed attacks on Riyadh airport, Dammam and an Aramco building in Dhahran on 13 to 14 October.", P("Ahram/AFP, 15 Oct 2026", AHRAM, "B2"), False),
 ]

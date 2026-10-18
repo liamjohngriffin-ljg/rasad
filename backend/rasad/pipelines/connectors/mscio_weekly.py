@@ -80,8 +80,10 @@ def _week_end(text: str, filename: str | None) -> date | None:
             except ValueError:
                 pass
     years = re.findall(r"\b(20[23]\d)\b", text[:3000])
-    year = int(max(set(years), key=years.count)) if years else None
+    year = int(max(set(years), key=lambda y: (years.count(y), y))) if years else None  # ties go to the later year
     m = TITLE_RANGE_RE.search(text[:400])
+    if m and year and m.group(2) and m.group(2).lower()[:3] == "dec" and m.group(4).lower()[:3] == "jan":
+        year = max(int(y) for y in years)
     if m and year and m.group(4).lower()[:3] in MONTHS:
         try:
             return date(year, MONTHS[m.group(4).lower()[:3]], int(m.group(3)))
@@ -142,6 +144,8 @@ def _alert_incidents(text: str, week_end: date | None) -> list[dict]:
                         d = cand
                 except ValueError:
                     pass
+            if week_end is not None and d > week_end + timedelta(days=7):
+                d = d.replace(year=d.year - 1)
             country = _place(body) or _place(loc or "") or None
             low = body.lower()
             if re.search(r"hijack|boarded|seized|detained|unauthorised persons", low):
@@ -184,8 +188,10 @@ def _incidents(text: str, week_end: date | None) -> list[dict]:
             lon = -lon if lm.group(7).upper() == "W" else lon
         vm = VESSEL_RE.search(b)
         vessel = " ".join(vm.group(1).split()) if vm else None
-        rel = re.search(r"RELEVANT INFORMATION[^\n]*\n(.{40,700}?)(?:\n\s*4\.|\n\s*3\.\d|$)", b, re.S)
-        summary = " ".join(rel.group(1).split()) if rel else " ".join(b[:400].split())
+        rel = re.search(r"RELEVANT\s*INFORMATION[^\n]*\n(.{40,2000}?)(?=\n\s*4\.|\n\s*RECOMMENDATIONS|\n\s*ANALYSIS|$)", b, re.S)
+        summary = " ".join(rel.group(1).split()) if rel else " ".join(re.sub(r"^.*?TYPE OF INCIDENT:[^\n]*\n", "", b, count=1, flags=re.S)[:400].split())
+        if d is not None and week_end is not None and d > week_end + timedelta(days=7):
+            d = d.replace(year=d.year - 1)  # a late-December incident in a report dated early January
         items.append({"category": cat, "date": d, "location": loc, "lat": lat, "lon": lon, "vessel": vessel, "summary": summary[:600], "ref": None, "country": _place(loc or "") or "GULF_OF_ADEN"})
     return items
 
