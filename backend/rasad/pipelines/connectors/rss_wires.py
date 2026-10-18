@@ -14,14 +14,18 @@ from time import mktime
 import feedparser
 from sqlalchemy.orm import Session
 
-from .base import RawDoc, check_egress, upsert_document
+from .base import RawDoc, check_egress, fetch_bytes, upsert_document
 
+# code -> (feed URLs, language). QNA publishes per-section feeds; SPA and WAM render their
+# sites in the browser and expose no feed, so they are covered by GDELT and the operator's
+# own subscriptions until an API arrangement exists.
 FEEDS = {
-    "qna": ("https://qna.org.qa/en/rss", "en"),
-    "adm": ("https://www.mediaoffice.abudhabi/en/rss/", "en"),
-    "wam": ("https://wam.ae/en/rss", "en"),
-    "spa": ("https://www.spa.gov.sa/rss", "ar"),
-    "tasnim": ("https://tasnimnews.ir/en/rss", "en"),
+    "qna": (["https://qna.org.qa/en/Pages/RSS-Feeds/Qatar", "https://qna.org.qa/en/Pages/RSS-Feeds/General", "https://qna.org.qa/en/Pages/RSS-Feeds/Analysis-and-Reports"], "en"),
+    "qna_ar": (["https://qna.org.qa/ar-qa/Pages/RSS-Feeds/Qatar", "https://qna.org.qa/ar-qa/Pages/RSS-Feeds/General"], "ar"),
+    "adm": (["https://www.mediaoffice.abudhabi/en/rss/"], "en"),
+    "wam": (["https://wam.ae/en/rss"], "en"),
+    "spa": (["https://www.spa.gov.sa/rss"], "ar"),
+    "tasnim": (["https://tasnimnews.ir/en/rss"], "en"),
 }
 
 
@@ -47,14 +51,19 @@ def ingest_docs(db: Session, docs: list[RawDoc]) -> int:
 
 
 def fetch_and_ingest(db: Session, source_code: str, *, allow_sanctioned: bool = False) -> int:
-    url, lang = FEEDS[source_code]
+    urls, lang = FEEDS[source_code]
     if source_code == "tasnim" and not allow_sanctioned:
         raise PermissionError("tasnim requires a recorded compliance review; pass allow_sanctioned=True")
-    check_egress(url)
-    parsed = feedparser.parse(url)
-    docs = []
-    for e in parsed.entries:
-        published = datetime.fromtimestamp(mktime(e.published_parsed)) if getattr(e, "published_parsed", None) else None
-        text = " ".join(x for x in [getattr(e, "title", ""), getattr(e, "summary", "")] if x)
-        docs.append(RawDoc(source_code, getattr(e, "id", None) or getattr(e, "link", ""), text, url=getattr(e, "link", None), title=getattr(e, "title", None), language=lang, published_at=published))
+    docs: list[RawDoc] = []
+    errors: list[str] = []
+    for url in urls:
+        check_egress(url)
+        try:
+            content = fetch_bytes(url, timeout=60)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{url}: {exc}")
+            continue
+        docs.extend(parse_feed(source_code.split("_")[0], content, lang))
+    if not docs and errors:
+        raise RuntimeError("; ".join(errors)[:400])
     return ingest_docs(db, docs)

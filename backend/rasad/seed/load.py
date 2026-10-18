@@ -95,12 +95,24 @@ def load_ledgers(db: Session, as_of: date) -> None:
                 is_synthetic=synth,
             ))
     if db.scalar(select(SeriesPoint).limit(1)) is None:
+        # the shipped snapshot carries the sourced record (PortWatch, JMIC, UKMTO, sanctions lists);
+        # synthetic shaping is generated only for series the snapshot does not cover
+        from . import snapshot
+
+        db.flush()
+        snapshot.load(db, include_observations=False)
+        have = {s for (s,) in db.execute(select(SeriesPoint.series).distinct())}
         start = date(2025, 1, 1)
-        for d, v, synth in ledgers.hormuz_transit_series(start, as_of):
-            db.add(SeriesPoint(series="hormuz_transits", date=d, value=v, unit="transits_per_day", source="demo series shaped by PortWatch anchors", is_synthetic=synth))
-        for d, v, synth in ledgers.bab_el_mandeb_series(start, as_of):
-            db.add(SeriesPoint(series="bab_el_mandeb_transits", date=d, value=v, unit="transits_per_day", source="demo series", is_synthetic=synth))
+        if "hormuz_transits" not in have:
+            for d, v, synth in ledgers.hormuz_transit_series(start, as_of):
+                db.add(SeriesPoint(series="hormuz_transits", date=d, value=v, unit="transits_per_day", source="demo series shaped by PortWatch anchors", is_synthetic=synth))
+        if "bab_el_mandeb_transits" not in have:
+            for d, v, synth in ledgers.bab_el_mandeb_series(start, as_of):
+                db.add(SeriesPoint(series="bab_el_mandeb_transits", date=d, value=v, unit="transits_per_day", source="demo series", is_synthetic=synth))
+        existing = {(s, d) for s, d in db.execute(select(SeriesPoint.series, SeriesPoint.date))}
         for d, series, v, unit, src, synth in ledgers.SERIES_ANCHORS:
+            if (series, _d(d)) in existing:
+                continue
             db.add(SeriesPoint(series=series, date=_d(d), value=v, unit=unit, source=src, is_synthetic=synth))
     if db.scalar(select(PolicyObservation).limit(1)) is None:
         for (d, actor, issue, track, channel, cost, level, lang, score, grade, excerpt, excerpt_en, prov, synth) in ledgers.OBSERVATIONS:
@@ -111,6 +123,10 @@ def load_ledgers(db: Session, as_of: date) -> None:
                 verification="verified" if not synth else "pending", verified_by="seed" if not synth else None,
                 is_synthetic=synth,
             ))
+        db.flush()
+        from . import snapshot
+
+        snapshot.load(db, include_series=False, include_events=False)
     if db.scalar(select(Forecaster).limit(1)) is None:
         for code, name, kind, w in ledgers.FORECASTERS:
             db.add(Forecaster(code=code, name=name, kind=kind, skill_weight=w))

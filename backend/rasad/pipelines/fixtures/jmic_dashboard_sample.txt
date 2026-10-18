@@ -1,13 +1,114 @@
-JMIC MIDDLE EAST WEEKLY DASHBOARD
-Week 41, 5 - 11 October 2026
-
-THREAT LEVELS
-Arabian Gulf: CRITICAL. Attacks on merchant vessels reported off the UAE and Qatar on at least four days this week.
-Strait of Hormuz: CRITICAL. Mine threat persists; transits remain severely reduced.
-Gulf of Oman: SEVERE.
-Red Sea: SUBSTANTIAL. Houthi UAV activity continues in the southern Red Sea.
-Bab al Mandab: SUBSTANTIAL.
-Gulf of Aden: MODERATE.
-
-ADVISORIES
-Mariners are reminded of the standing mine warning for the Strait of Hormuz and approaches.
+JMIC Weekly Dashboard for the Middle East
+Accurate and timely information for the protection of Mariners
+Week 08 - 2026
+(16 to 22 Feb)
+Combined Maritime Forces
+1/12
+JMIC Weekly Assessment​ for the Middle East Region
+Guidance for Vessels transiting the High Threat Area
+Houthi forces have paused maritime strikes, consistent with their previous pattern of linking ops to developments in Gaza. Should the ceasefire collapse, the Houthis would
+HIGHLY LIKELY resume attacks against Israel and non Israel-affiliated interests. The threat level remains at MODERATE for any merchant vessel (MV) when transiting
+the RS, BAM and GoA. The axis of resistance group Hezbollah and Houthi have voiced strong support for Iran with sustained rhetoric from the Houthis, warning that, any
+attack on Iran would turn all US ships and interests in the region into legitimate targets.
+NAVTEX / Coastal warning notes may be promulgated by Iranian authorities on short notice. All mariners are encouraged to report receipt of NAVTEX messages to
+UKMTO.
+JMIC continues to monitor reports of suspicious approaches in the region and will issue Information Notes for confirmed pirate activity.
+No active PAGs are noted at time of this report assessed possibly due to unfavourable weather conditions.
+Risk mitigation measures and resources include:
+1. BMP-Maritime Security
+2. JMIC Bridge Emergency Reference Cards
+3. Register for ASPIDES protection via EUNAVFOR ASPIDES website
+Specific Events
+Indian Ocean and Coast of Somalia
+• The piracy threat is currently assessed as LOW in the Gulf of Aden, Somali Basin and the Indian Ocean.
+Arabian Gulf, Strait of Hormuz and Central Red Sea
+• SUBSTANTIAL EMI
+• Maintain awareness on small crafts operating in the Bab-al-Mandeb area, but be aware that not all small crafts have hostile intentions.
+There is a large presence of fishermen operating small crafts in BAM and GoAfrom Nov to Feb due to Yellowfin Tuna Season.
+2/12
+CMF Regional Threat Level Assessment
+Houthi Threat L
+A
+C
+The threat level remains at MODERATE for any merchant vessel (MV) or shipping company (inc. fleet) transiting I T Attack Definition
+I Probability
+R
+the RS, BAM and GoA. The axis of resistance, comprising of Hezbollah and the Houthis, continues to voice
+C
+support for Iran, with sustained rhetoric from the Houthis warning that any attack on Iran would render US ships There is a remote chance of an
+Low
+attack. <10%
+and interests in the region as legitimate targets.
+Moderate An attack is unlikely. <25%
+Given the sustained volatility in the region, Houthi intent to resume attacks against shipping they deem legitimate
+There is a realistic possibly of an
+E Substantial
+targets could change rapidly. The current threat level reflects risks to all shipping in the region, irrespective of flag R attack. ~50%
+E
+state, ownership, or recent port calls, particularly in light of the time elapsed since the Gaza ceasefire.
+V
+Severe An attack is highly likely. ~75%
+E
+S
+Critical An attack is almost certain. >90%
+Other Disruption Threats
+Levels of GNSS interference in the Arabian Gulf (AG) are assessed as SUBSTANTIAL, including in the Arabian L
+A
+Gulf, Gulf of Oman, and Central Red Sea. I T CRS EMI
+N
+A
+There have been sustained and increased levels of EMI in the Strait of Hormuz (SoH) over the past seven days. T SoH /AG EMI
+S
+B
+U SoH HARASSMENT
+In the context of heightened regional tensions and increased IRGC military activity in vicinity of SoH, the S
+harassment threat level in the SoH is assessed as SUBSTANTIAL, while the threat level for a SoH blockade has
+been increased to MODERATE.
+E
+T
+A
+CMF Assessment - Piracy Threat R HOUTHI THREAT TO MARINERS
+E
+D
+The piracy threat is assessed as LOW in the Somali Basin. Weather conditions are expected to remain largely
+O
+permissive for small boat operations, with conditions improving as the monsoon season draws to a close. M
+SoH BLOCKADE
+PIRACY
+The presence of foreign fishing vessels (FFVs) operating within the Somali EEZ increases opportunities for piracy-
+related activities. Hijacked vessels may be held for ransom or used as motherships to target FFVs further offshore
+W
+in areas of dense shipping traffic. O
+L
+3
+CMF Regional Threat Level Assessment
+Key Considerations
+17 Feb 2026 – As part of its “Smart Control of The Strait of Hormuz” exercise, Iran conducted a live-fire missile drill in the vicinity
+of SoH.
+20 Feb 2026 – There are unconfirmed reports of a projectile being fired from Yemeni territory, with the projected impact zone in
+the Southern Red Sea.
+4
+JMIC Investigated Incidents
+Total number of Incidents 128
+(excludingcoalition engagements) (1 new this week)
+Days since last incident / incident type 06 days / Suspicious Activities (since 17 Feb 26)
+Red Sea / GoA Incidents Indian Ocean and Coast of Arabian Gulf / SoH / GOO
+Somalia
+5
+5
+10
+2 2
+5
+5
+2
+3
+2 2
+1 0
+0
+0
+0
+Last incident info: Last incident info: Last incident info:
+Date: 17 FEB 2026 Date: 07 NOV 2025 Date: 14 NOV 2025
+Type: SUSPICIOUS ACTIVITY Type: ATTEMPTED PIRATE ATTACK Type: SUSPICIOUS ACTIVITY
+Ship: TUG Ship: TANKER Ship: TANKER
+9/12

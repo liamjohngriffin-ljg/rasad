@@ -26,10 +26,11 @@ class Settings(BaseModel):
         h.strip()
         for h in os.getenv(
             "RASAD_EGRESS_ALLOWLIST",
-            "ukmto.org,mscio.eu,combinedmaritimeforces.com,portwatch.imf.org,"
+            "ukmto.org,mscio.eu,combinedmaritimeforces.com,portwatch.imf.org,services9.arcgis.com,"
             "lmalloyds.com,sanctionslist.ofac.treas.gov,www.gov.uk,assets.publishing.service.gov.uk,"
-            "www.state.gov,api.gdeltproject.org,data.gdeltproject.org,qna.org.qa,wam.ae,spa.gov.sa,"
-            "www.mediaoffice.abudhabi,tasnimnews.ir,api.congress.gov,api.govinfo.gov",
+            "sanctionslist.fcdo.gov.uk,www.state.gov,api.gdeltproject.org,data.gdeltproject.org,"
+            "qna.org.qa,wam.ae,spa.gov.sa,www.spa.gov.sa,www.mediaoffice.abudhabi,tasnimnews.ir,"
+            "api.congress.gov,api.govinfo.gov",
         ).split(",")
         if h.strip()
     ]
