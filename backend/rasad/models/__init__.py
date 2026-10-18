@@ -1,3 +1,4 @@
+from ..auth.models import AuditLog, User  # noqa: F401
 from .core import (  # noqa: F401
     Actor,
     Brief,

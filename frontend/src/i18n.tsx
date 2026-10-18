@@ -18,6 +18,12 @@ const STR = {
     tier: 'Tier', licence: 'Licence', reuse: 'Reuse', lang: 'العربية', issue: 'Issue', score: 'Score', confidence: 'confidence',
     watch: 'What would move it next', yardstick: 'Yardstick', weight: 'machine weight', tasking: 'Ask a question', submit: 'Submit',
     taskingPlaceholder: 'Pose a new question; within 48 hours it has an indicator framework and a baseline.', queueEmpty: 'Nothing pending.',
+    username: 'Username', password: 'Password', signIn: 'Sign in', signOut: 'Sign out', users: 'Users', name: 'Name', role: 'Role', status: 'Status',
+    lastLogin: 'Last sign-in', active: 'active', inactive: 'inactive', mustChange: 'must change password', newPasswordFor: 'New temporary password for',
+    resetPassword: 'Reset password', deactivate: 'Deactivate', activate: 'Activate', tempPassword: 'Temporary password (10+ characters)', addUser: 'Add user',
+    userHint: 'New users must change their password on first sign-in. Viewers read; analysts verify evidence and commit forecasts; admins manage users.',
+    auditLog: 'Audit log', account: 'Account', mustChangeHint: 'Please set a new password before continuing.', currentPassword: 'Current password',
+    newPassword: 'New password (10+ characters)', changePassword: 'Change password', passwordUpdated: 'Password updated.',
   },
   ar: {
     app: 'رصد', board: 'اللوحة', positions: 'سجل المواقف', calibration: 'السجل', queue: 'التحقق', sources: 'المصادر',
@@ -34,6 +40,12 @@ const STR = {
     tier: 'المستوى', licence: 'الترخيص', reuse: 'إعادة الاستخدام', lang: 'English', issue: 'المسألة', score: 'الدرجة', confidence: 'الثقة',
     watch: 'ما الذي قد يحرّكه لاحقاً', yardstick: 'المقياس', weight: 'وزن المحرك', tasking: 'اطرح سؤالاً', submit: 'إرسال',
     taskingPlaceholder: 'اطرح سؤالاً جديداً؛ خلال 48 ساعة يكون له إطار مؤشرات ومعدل أساسي.', queueEmpty: 'لا شيء قيد التحقق.',
+    username: 'اسم المستخدم', password: 'كلمة المرور', signIn: 'تسجيل الدخول', signOut: 'تسجيل الخروج', users: 'المستخدمون', name: 'الاسم', role: 'الدور', status: 'الحالة',
+    lastLogin: 'آخر دخول', active: 'نشط', inactive: 'موقوف', mustChange: 'يجب تغيير كلمة المرور', newPasswordFor: 'كلمة مرور مؤقتة جديدة لـ',
+    resetPassword: 'إعادة تعيين كلمة المرور', deactivate: 'إيقاف', activate: 'تفعيل', tempPassword: 'كلمة مرور مؤقتة (10 أحرف فأكثر)', addUser: 'إضافة مستخدم',
+    userHint: 'يجب على المستخدمين الجدد تغيير كلمة المرور عند أول دخول. المشاهد يقرأ؛ المحلل يتحقق من الأدلة ويعتمد التقديرات؛ المدير يدير المستخدمين.',
+    auditLog: 'سجل التدقيق', account: 'الحساب', mustChangeHint: 'يرجى تعيين كلمة مرور جديدة قبل المتابعة.', currentPassword: 'كلمة المرور الحالية',
+    newPassword: 'كلمة مرور جديدة (10 أحرف فأكثر)', changePassword: 'تغيير كلمة المرور', passwordUpdated: 'تم تحديث كلمة المرور.',
   },
 } as const
 

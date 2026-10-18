@@ -1,9 +1,10 @@
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: rasad
-      POSTGRES_PASSWORD: ${RASAD_DB_PASSWORD:-rasad}
+      POSTGRES_PASSWORD: ${RASAD_DB_PASSWORD:?set RASAD_DB_PASSWORD in .env}
       POSTGRES_DB: rasad
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -15,28 +16,78 @@ services:
 
   api:
     build: .
-    environment:
-      RASAD_DATABASE_URL: postgresql+psycopg://rasad:${RASAD_DB_PASSWORD:-rasad}@db:5432/rasad
+    restart: unless-stopped
+    environment: &api_env
+      RASAD_DATABASE_URL: postgresql+psycopg://rasad:${RASAD_DB_PASSWORD}@db:5432/rasad
       RASAD_MODEL_PROVIDER: ${RASAD_MODEL_PROVIDER:-rules}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       RASAD_LOCAL_MODEL_BASE_URL: ${RASAD_LOCAL_MODEL_BASE_URL:-}
       RASAD_LOCAL_MODEL_NAME: ${RASAD_LOCAL_MODEL_NAME:-jais-2-70b-chat}
+      RASAD_ADMIN_USERNAME: ${RASAD_ADMIN_USERNAME:-admin}
+      RASAD_ADMIN_PASSWORD: ${RASAD_ADMIN_PASSWORD:-}
+      RASAD_SECRET: ${RASAD_SECRET:-}
+      RASAD_PUBLIC_RECORD: ${RASAD_PUBLIC_RECORD:-false}
+      RASAD_CORS_ORIGINS: ""
       RASAD_DATA_DIR: /data
+      TZ: ${TZ:-Asia/Dubai}
     volumes:
       - rasad_data:/data
+    expose:
+      - "8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-}
     ports:
-      - "127.0.0.1:8000:8000"
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+  scheduler:
+    build: .
+    restart: unless-stopped
+    environment:
+      <<: *api_env
+      RASAD_PIPELINE_TIME: ${RASAD_PIPELINE_TIME:-06:00}
+      RASAD_PIPELINE_RUN_ON_START: "false"
+    volumes:
+      - rasad_data:/data
+    command: ["python", "-m", "rasad.pipelines.scheduler"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${RASAD_DB_PASSWORD}
+      RETENTION_DAYS: ${RASAD_BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - ./deploy/backup.sh:/backup.sh:ro
+      - backups:/backups
+    command: ["sh", "/backup.sh"]
     depends_on:
       db:
         condition: service_healthy
 
   # One-shot: seed reference data, ledgers and a 30-day forecast history.
+  #   docker compose --profile seed run --rm seed
   seed:
     build: .
     profiles: ["seed"]
-    environment:
-      RASAD_DATABASE_URL: postgresql+psycopg://rasad:${RASAD_DB_PASSWORD:-rasad}@db:5432/rasad
-      RASAD_DATA_DIR: /data
+    environment: *api_env
     volumes:
       - rasad_data:/data
     command: ["python", "-m", "rasad.seed.load"]
@@ -44,17 +95,11 @@ services:
       db:
         condition: service_healthy
 
-  # Daily pipeline: poll sources, extract, commit forecasts. Run from cron on the host:
-  #   docker compose run --rm pipeline
+  # Manual pipeline run:  docker compose --profile pipeline run --rm pipeline
   pipeline:
     build: .
     profiles: ["pipeline"]
-    environment:
-      RASAD_DATABASE_URL: postgresql+psycopg://rasad:${RASAD_DB_PASSWORD:-rasad}@db:5432/rasad
-      RASAD_MODEL_PROVIDER: ${RASAD_MODEL_PROVIDER:-rules}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      RASAD_LOCAL_MODEL_BASE_URL: ${RASAD_LOCAL_MODEL_BASE_URL:-}
-      RASAD_DATA_DIR: /data
+    environment: *api_env
     volumes:
       - rasad_data:/data
     command: ["python", "-m", "rasad.pipelines.run", "daily"]
@@ -65,3 +110,6 @@ services:
 volumes:
   pgdata:
   rasad_data:
+  caddy_data:
+  caddy_config:
+  backups:

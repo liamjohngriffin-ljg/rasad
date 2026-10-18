@@ -43,7 +43,7 @@ def test_verification_and_tasking(client):
     assert q["events"] or q["observations"]
     if q["events"]:
         eid = q["events"][0]["id"]
-        r = client.post(f"/api/verification/event/{eid}", json={"decision": "verified", "by": "test"})
+        r = client.post(f"/api/verification/event/{eid}", json={"decision": "verified", "by": "ana"})
         assert r.status_code == 200 and r.json()["verification"] == "verified"
     r = client.post("/api/tasking", json={"text": "Probability of a Houthi strike on Jeddah port within 30 days?", "requested_by": "principal"})
     assert r.status_code == 200

@@ -16,7 +16,8 @@ Version 0.1 is the vertical slice from the concept document: the Hormuz and Red 
 | Connectors | `backend/rasad/pipelines/connectors` | UKMTO advisories, JMIC dashboards, IMF PortWatch, Lloyd's JWC circulars, OFAC and UK sanctions, State Department FMS notifications, state wires via RSS; each parser tested on a fixture |
 | Extraction | `backend/rasad/extraction` | Lexicon extraction (Arabic, Farsi, English) that always works; optional Claude API or local open-weight model behind the same interface; everything lands in the verification queue |
 | Briefs | `backend/rasad/briefs` | Two-to-three page brief per question in Arabic or English, PHIA yardstick bands, confidence stated separately; optional model polish that may not add a fact |
-| API | `backend/rasad/api/app.py` | FastAPI; serves the built front end |
+| Accounts | `backend/rasad/auth` | Users, roles, signed-cookie sessions, audit log, operator CLI |
+| API | `backend/rasad/api` | FastAPI; serves the built front end; every route behind sign-in |
 | Front end | `frontend/` | React, TypeScript, Tailwind; board, question page with evidence, position book, brief, record, verification queue, sources; full right-to-left Arabic |
 
 ## Run it locally
@@ -34,19 +35,55 @@ npm install
 npm run dev                                   # http://localhost:5173
 ```
 
-Tests: `cd backend && pytest -q` (25 tests: engine, policy maths, every connector against its fixture, the API end to end).
+Tests: `cd backend && pytest -q` (32 tests: engine, policy maths, every connector against its fixture, accounts and roles, the API end to end).
 
-## Run it on a server
+## Run it for real (a server you keep)
+
+One command on a fresh Ubuntu server. Point a hostname at the server first if you want TLS (an A record for, say, `rasad.yourdomain.com`); without one it serves plain HTTP for a first look.
 
 ```bash
-cp .env.example .env            # set a database password; leave the model provider as "rules" unless you have one
-docker compose up -d --build    # api on 127.0.0.1:8000, put a reverse proxy with TLS in front
-docker compose --profile seed run --rm seed
-# daily at 06:00: poll sources, extract, commit forecasts
-echo "0 6 * * * cd $(pwd) && docker compose --profile pipeline run --rm pipeline >> pipeline.log 2>&1" | crontab -
+# copy the repo to the server (scp, rsync or git clone), then:
+sudo bash deploy/install.sh rasad.yourdomain.com
 ```
 
-Connector URLs for PDFs (UKMTO advisories, JWC circulars, JMIC dashboards) and the PortWatch export go in `/data/urls.yaml` inside the volume; see `backend/rasad/pipelines/run.py` for the keys. Connectors refuse any host not on `RASAD_EGRESS_ALLOWLIST`.
+That installs Docker, opens ports 22, 80 and 443, writes `.env` with generated secrets, builds and starts five containers (Postgres, the API with the front end, Caddy for TLS, the daily scheduler, nightly backups), seeds the demo data and prints the first admin password. Sign in, change the password, add colleagues under Users.
+
+What runs afterwards without you:
+
+| Service | What it does | Where to look |
+| --- | --- | --- |
+| scheduler | Polls the configured sources, extracts, commits forecasts every day at `RASAD_PIPELINE_TIME` (06:00 Dubai by default) | `docker compose logs -f scheduler` |
+| backup | `pg_dump` every 24 hours, kept for 30 days | the `backups` volume: `docker compose exec backup ls /backups` |
+| web (Caddy) | TLS certificate issue and renewal, security headers | `docker compose logs web` |
+
+Day-to-day operations:
+
+```bash
+docker compose ps                                   # health
+docker compose logs -f api                          # requests and errors
+docker compose --profile pipeline run --rm pipeline # run the pipeline now
+docker compose exec api python -m rasad.auth.cli list        # accounts
+docker compose exec api python -m rasad.auth.cli password liam
+sudo bash deploy/update.sh                          # deploy a new version (data and .env untouched)
+```
+
+Restore from a backup: `zcat backups/rasad-YYYYMMDD-HHMM.sql.gz | docker compose exec -T db psql -U rasad rasad` into a fresh database.
+
+Connector URLs for PDFs (UKMTO advisories, JWC circulars, JMIC dashboards) and the PortWatch export go in `urls.yaml` in the data volume (`docker compose exec api sh -c 'cat > /data/urls.yaml'`); see `backend/rasad/pipelines/run.py` for the keys. Connectors refuse any host not on `RASAD_EGRESS_ALLOWLIST`.
+
+## Accounts and roles
+
+Everything behind the sign-in. Three roles:
+
+| Role | Can |
+| --- | --- |
+| viewer | Read the board, question pages, position book, record, briefs and sources; pose a question |
+| analyst | Viewer, plus the verification queue (accept or reject extracted evidence, correct a stance score) and committing forecasts |
+| admin | Analyst, plus user management and the audit log |
+
+New accounts get a temporary password and must set their own on first sign-in. Every sign-in, verification decision, commit, brief and user change is written to the audit log with the user and IP. Passwords are PBKDF2-SHA256; sessions are signed cookies that expire after 12 hours; ten failed sign-ins in a quarter hour lock that username for the rest of it.
+
+Bringing a team on, in order: give colleagues viewer access first so they read the board and briefs; promote the two who will own evidence to analyst and route all verification through them; keep admin to one person plus a deputy. Set `RASAD_PUBLIC_RECORD=true` only when the calibration record has real resolutions behind it.
 
 ## Demo data
 
@@ -69,8 +106,9 @@ The four resolved demo questions on the Record page were produced by replaying t
 ## Layout
 
 ```
-backend/rasad/   api  briefs  engine  extraction  models  pipelines  policy  seed
+backend/rasad/   api  auth  briefs  engine  extraction  models  pipelines  policy  seed
 backend/tests/
-frontend/src/    pages  components.tsx  api.ts  i18n.tsx
+frontend/src/    pages  components.tsx  api.ts  auth.tsx  i18n.tsx
+deploy/          install.sh  update.sh  Caddyfile  backup.sh
 Dockerfile  docker-compose.yml  .env.example
 ```

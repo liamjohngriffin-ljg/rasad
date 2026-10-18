@@ -11,6 +11,9 @@ import Record from './pages/Record'
 import Queue from './pages/Queue'
 import Sources from './pages/Sources'
 import BriefPage from './pages/BriefPage'
+import Users from './pages/Users'
+import Account from './pages/Account'
+import { AuthProvider } from './auth'
 
 const router = createBrowserRouter([
   {
@@ -24,6 +27,8 @@ const router = createBrowserRouter([
       { path: 'record', element: <Record /> },
       { path: 'queue', element: <Queue /> },
       { path: 'sources', element: <Sources /> },
+      { path: 'users', element: <Users /> },
+      { path: 'account', element: <Account /> },
     ],
   },
 ])
@@ -31,7 +36,9 @@ const router = createBrowserRouter([
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <LangProvider>
-      <RouterProvider router={router} />
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
     </LangProvider>
   </StrictMode>,
 )

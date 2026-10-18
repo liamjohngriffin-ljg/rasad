@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from datetime import date, datetime, timedelta
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -11,8 +11,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import __version__
+from ..auth import core as auth
+from ..auth.models import User
 from ..briefs import generate as briefs
-from ..db import get_session, init_db
+from ..db import get_session, init_db, session_factory
 from ..engine import run as engine_run
 from ..engine import scoring
 from ..engine.commitment import verify_chain
@@ -32,14 +34,26 @@ from ..models import (
     ThreatEvent,
 )
 from ..policy import book as policy_book
+from . import auth_routes
+from .deps import client_ip, current_user, require_role
 
 app = FastAPI(title="Rasad API", version=__version__)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+_dev_origins = [o.strip() for o in os.getenv("RASAD_CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()]
+app.add_middleware(CORSMiddleware, allow_origins=_dev_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.include_router(auth_routes.router)
+PUBLIC_RECORD = os.getenv("RASAD_PUBLIC_RECORD", "false").lower() in ("1", "true", "yes")
 
 
 @app.on_event("startup")
 def _startup() -> None:
     init_db()
+    db = session_factory()()
+    try:
+        generated = auth.bootstrap_admin(db)
+        if generated:
+            print("Rasad: created the first admin account; its password is in <data_dir>/admin-password.txt", flush=True)
+    finally:
+        db.close()
 
 
 def _as_of(v: str | None) -> date:
@@ -52,7 +66,7 @@ def _as_of(v: str | None) -> date:
 
 
 @app.get("/api/status")
-def status(db: Session = Depends(get_session)) -> dict:
+def status(db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
     synthetic = (db.scalar(select(func.count(ThreatEvent.id)).where(ThreatEvent.is_synthetic)) or 0) + (
         db.scalar(select(func.count(PolicyObservation.id)).where(PolicyObservation.is_synthetic)) or 0
     ) + (db.scalar(select(func.count(SeriesPoint.id)).where(SeriesPoint.is_synthetic)) or 0)
@@ -108,14 +122,14 @@ def _question_summary(db: Session, q: Question, as_of: date) -> dict:
 
 
 @app.get("/api/board")
-def board(as_of: str | None = None, db: Session = Depends(get_session)) -> dict:
+def board(as_of: str | None = None, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
     d = _as_of(as_of)
     qs = db.scalars(select(Question).where(Question.status == "open").order_by(Question.order)).all()
     return {"as_of": d.isoformat(), "questions": [_question_summary(db, q, d) for q in qs]}
 
 
 @app.get("/api/questions/{code}")
-def question_detail(code: str, as_of: str | None = None, db: Session = Depends(get_session)) -> dict:
+def question_detail(code: str, as_of: str | None = None, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
     d = _as_of(as_of)
     q = db.scalar(select(Question).where(Question.code == code))
     if q is None:
@@ -188,7 +202,7 @@ def _event_row(e: ThreatEvent) -> dict:
 
 
 @app.get("/api/events")
-def events(days: int = 120, event_type: str | None = None, as_of: str | None = None, db: Session = Depends(get_session)) -> list[dict]:
+def events(days: int = 120, event_type: str | None = None, as_of: str | None = None, db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
     d = _as_of(as_of)
     stmt = select(ThreatEvent).where(ThreatEvent.event_date > d - timedelta(days=days), ThreatEvent.event_date <= d).order_by(ThreatEvent.event_date.desc())
     if event_type:
@@ -197,7 +211,7 @@ def events(days: int = 120, event_type: str | None = None, as_of: str | None = N
 
 
 @app.get("/api/series/{name}")
-def series(name: str, days: int = 365, as_of: str | None = None, db: Session = Depends(get_session)) -> dict:
+def series(name: str, days: int = 365, as_of: str | None = None, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
     d = _as_of(as_of)
     pts = db.scalars(select(SeriesPoint).where(SeriesPoint.series == name, SeriesPoint.date > d - timedelta(days=days), SeriesPoint.date <= d).order_by(SeriesPoint.date)).all()
     return {
@@ -208,7 +222,7 @@ def series(name: str, days: int = 365, as_of: str | None = None, db: Session = D
 
 
 @app.get("/api/sources")
-def sources(db: Session = Depends(get_session)) -> list[dict]:
+def sources(db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
     return [
         {"code": s.code, "name": s.name, "tier": s.tier, "kind": s.kind, "url": s.url, "language": s.language, "licence_note": s.licence_note, "reuse_ok": s.reuse_ok}
         for s in db.scalars(select(Source).order_by(Source.tier, Source.code)).all()
@@ -221,7 +235,7 @@ def sources(db: Session = Depends(get_session)) -> list[dict]:
 
 
 @app.get("/api/actors")
-def actors(db: Session = Depends(get_session)) -> list[dict]:
+def actors(db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
     counts = dict(db.execute(select(PolicyObservation.actor_id, func.count(PolicyObservation.id)).group_by(PolicyObservation.actor_id)).all())
     return [
         {"code": a.code, "name_en": a.name_en, "name_ar": a.name_ar, "kind": a.kind, "observations": counts.get(a.id, 0)}
@@ -230,7 +244,7 @@ def actors(db: Session = Depends(get_session)) -> list[dict]:
 
 
 @app.get("/api/actors/{code}/book")
-def actor_book(code: str, as_of: str | None = None, db: Session = Depends(get_session)) -> dict:
+def actor_book(code: str, as_of: str | None = None, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
     try:
         return policy_book.actor_book(db, code, _as_of(as_of))
     except KeyError:
@@ -238,12 +252,12 @@ def actor_book(code: str, as_of: str | None = None, db: Session = Depends(get_se
 
 
 @app.get("/api/actors/{code}/issues/{issue}/observations")
-def observations(code: str, issue: str, db: Session = Depends(get_session)) -> list[dict]:
+def observations(code: str, issue: str, db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
     return policy_book.observation_rows(db, code, issue)
 
 
 @app.get("/api/issues")
-def issues(db: Session = Depends(get_session)) -> list[dict]:
+def issues(db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
     return [
         {"code": i.code, "name_en": i.name_en, "name_ar": i.name_ar, "low_label_en": i.low_label_en, "high_label_en": i.high_label_en, "cap_code": i.cap_code}
         for i in db.scalars(select(Issue).order_by(Issue.code)).all()
@@ -255,8 +269,14 @@ def issues(db: Session = Depends(get_session)) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+def _record_access(request: Request, db: Session = Depends(get_session)) -> None:
+    if PUBLIC_RECORD:
+        return
+    current_user(request, db)
+
+
 @app.get("/api/calibration")
-def calibration(db: Session = Depends(get_session)) -> dict:
+def calibration(db: Session = Depends(get_session), _: None = Depends(_record_access)) -> dict:
     rows = db.scalars(select(Forecast).order_by(Forecast.id)).all()
     chain = [
         {"prev_hash": r.prev_hash, "question_code": r.question.code, "as_of": r.as_of, "final_prob": r.final_prob, "decomposition": r.decomposition, "commit_hash": r.commit_hash}
@@ -291,7 +311,7 @@ def calibration(db: Session = Depends(get_session)) -> dict:
 
 
 @app.get("/api/forecasts/chain")
-def chain(limit: int = 200, db: Session = Depends(get_session)) -> list[dict]:
+def chain(limit: int = 200, db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
     rows = db.scalars(select(Forecast).order_by(Forecast.id.desc()).limit(limit)).all()
     return [
         {"id": r.id, "question": r.question.code, "as_of": r.as_of.isoformat(), "final_prob": r.final_prob, "prev_hash": r.prev_hash, "commit_hash": r.commit_hash, "committed_at": r.committed_at.isoformat()}
@@ -304,9 +324,10 @@ class CommitRequest(BaseModel):
 
 
 @app.post("/api/forecasts/commit")
-def commit_forecasts(req: CommitRequest, db: Session = Depends(get_session)) -> dict:
+def commit_forecasts(req: CommitRequest, db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))) -> dict:
     d = _as_of(req.as_of)
     out = engine_run.commit_all_open(db, d)
+    auth.audit(db, user, "forecasts_committed", d.isoformat(), {"n": len(out)})
     return {"as_of": d.isoformat(), "committed": [{"question": f.question.code, "final_prob": f.final_prob, "commit_hash": f.commit_hash} for f in out]}
 
 
@@ -316,11 +337,12 @@ def commit_forecasts(req: CommitRequest, db: Session = Depends(get_session)) -> 
 
 
 @app.get("/api/briefs/{code}")
-def brief(code: str, lang: str = Query("en", pattern="^(en|ar)$"), as_of: str | None = None, polish: bool = True, db: Session = Depends(get_session)) -> dict:
+def brief(code: str, lang: str = Query("en", pattern="^(en|ar)$"), as_of: str | None = None, polish: bool = True, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
     try:
         b = briefs.generate(db, code, _as_of(as_of), lang, polish=polish)
     except KeyError:
         raise HTTPException(404, "question not found")
+    auth.audit(db, user, "brief_generated", code, {"lang": lang})
     return {"id": b.id, "question": code, "lang": b.lang, "generator": b.generator, "generated_at": b.generated_at.isoformat(), "content_md": b.content_md}
 
 
@@ -330,15 +352,16 @@ class TaskingIn(BaseModel):
 
 
 @app.post("/api/tasking")
-def create_tasking(req: TaskingIn, db: Session = Depends(get_session)) -> dict:
-    t = TaskingRequest(text=req.text, requested_by=req.requested_by)
+def create_tasking(req: TaskingIn, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+    t = TaskingRequest(text=req.text, requested_by=req.requested_by or user.username)
     db.add(t)
     db.commit()
+    auth.audit(db, user, "tasking_created", str(t.id), {"text": req.text[:200]})
     return {"id": t.id, "status": t.status, "created_at": t.created_at.isoformat()}
 
 
 @app.get("/api/tasking")
-def list_tasking(db: Session = Depends(get_session)) -> list[dict]:
+def list_tasking(db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
     return [
         {"id": t.id, "text": t.text, "requested_by": t.requested_by, "status": t.status, "created_at": t.created_at.isoformat(), "answer_md": t.answer_md}
         for t in db.scalars(select(TaskingRequest).order_by(TaskingRequest.created_at.desc())).all()
@@ -351,7 +374,7 @@ def list_tasking(db: Session = Depends(get_session)) -> list[dict]:
 
 
 @app.get("/api/verification/queue")
-def verification_queue(db: Session = Depends(get_session)) -> dict:
+def verification_queue(db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))) -> dict:
     evs = db.scalars(select(ThreatEvent).where(ThreatEvent.verification == "pending").order_by(ThreatEvent.event_date.desc())).all()
     obs = db.scalars(select(PolicyObservation).where(PolicyObservation.verification == "pending").order_by(PolicyObservation.observed_at.desc())).all()
     return {
@@ -370,7 +393,7 @@ class Decision(BaseModel):
 
 
 @app.post("/api/verification/{kind}/{item_id}")
-def verify(kind: str, item_id: int, req: Decision, db: Session = Depends(get_session)) -> dict:
+def verify(kind: str, item_id: int, req: Decision, db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))) -> dict:
     if req.decision not in ("verified", "rejected"):
         raise HTTPException(400, "decision must be verified or rejected")
     model = ThreatEvent if kind == "event" else PolicyObservation if kind == "observation" else None
@@ -380,11 +403,12 @@ def verify(kind: str, item_id: int, req: Decision, db: Session = Depends(get_ses
     if row is None:
         raise HTTPException(404, "not found")
     row.verification = req.decision
-    row.verified_by = req.by
+    row.verified_by = user.username
     row.verified_at = datetime.utcnow()
     if kind == "observation" and req.score is not None:
         row.score = max(-1.0, min(1.0, req.score))
     db.commit()
+    auth.audit(db, user, f"{kind}_{req.decision}", str(item_id), {"score": req.score} if req.score is not None else {})
     return {"id": item_id, "kind": kind, "verification": row.verification}
 
 

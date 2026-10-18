@@ -1,0 +1,14 @@
+# Reverse proxy with automatic TLS. Set DOMAIN in .env to a hostname that points at this server
+# and Caddy obtains and renews a Let's Encrypt certificate. With DOMAIN unset it serves plain
+# HTTP on port 80 for a first look (use an SSH tunnel rather than exposing that to the internet).
+{$DOMAIN::80} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		-Server
+	}
+	reverse_proxy api:8000
+}
