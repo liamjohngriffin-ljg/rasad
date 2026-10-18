@@ -18,6 +18,7 @@ import Evidence from './pages/Evidence'
 import Tasking from './pages/Tasking'
 import Today from './pages/Today'
 import Search from './pages/Search'
+import Admin from './pages/Admin'
 import { AuthProvider } from './auth'
 
 const router = createBrowserRouter([
@@ -39,6 +40,7 @@ const router = createBrowserRouter([
       { path: 'tasking', element: <Tasking /> },
       { path: 'today', element: <Today /> },
       { path: 'search', element: <Search /> },
+      { path: 'admin', element: <Admin /> },
     ],
   },
 ])

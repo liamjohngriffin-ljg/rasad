@@ -65,3 +65,29 @@ def test_password_change(viewer_client, users):
     # restore so other tests that log in as viewer still work
     r = viewer_client.post("/api/auth/password", json={"current_password": "another-long-one", "new_password": users["viewer"]})
     assert r.status_code == 200
+
+
+def test_licence_verify_and_evaluation_cap(tmp_path, monkeypatch):
+    from datetime import date
+
+    from rasad import licence
+
+    pub = licence.keygen(str(tmp_path / "k.key"))
+    doc = licence.issue(str(tmp_path / "k.key"), licensee="Org", seats=5, expires="2030-01-01", features=["core"])
+    assert licence.verify(doc, pub)["licensee"] == "Org"
+    doc["payload"]["seats"] = 500
+    try:
+        licence.verify(doc, pub)
+        raise AssertionError("tampered licence verified")
+    except ValueError:
+        pass
+    import json
+
+    p = tmp_path / "licence.json"
+    p.write_text(json.dumps(licence.issue(str(tmp_path / "k.key"), licensee="Org", seats=5, expires="2026-01-01", features=["core"])))
+    monkeypatch.setattr(licence, "VENDOR_PUBLIC_KEY_B64", pub)
+    assert licence.load(str(p), today=date(2025, 12, 1)).mode == "licensed"
+    assert licence.load(str(p), today=date(2026, 1, 15)).mode == "grace"
+    st = licence.load(str(p), today=date(2026, 3, 15))
+    assert st.mode == "evaluation" and st.seats == licence.EVALUATION_SEATS
+    assert licence.load(str(tmp_path / "missing.json")).mode == "evaluation"

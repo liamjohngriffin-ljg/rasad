@@ -118,3 +118,44 @@ def test_daily_alerts_changes_search_docx(client):
     assert client.post("/api/alerts/ack-all").json()["acknowledged"] >= 0
     st = client.get("/api/status").json()
     assert "open_alerts" in st and "marking" in st
+
+
+def test_admin_licence_keys_settings_exports(admin_client, client):
+    lic = admin_client.get("/api/licence").json()
+    assert lic["mode"] in ("evaluation", "licensed", "grace") and "seats_used" in lic
+    bad = admin_client.post("/api/licence", json={"document": {"payload": {"licensee": "x"}, "signature": "AAAA"}})
+    assert bad.status_code == 400
+    k = admin_client.post("/api/keys", json={"name": "bi-tool", "role": "viewer"})
+    assert k.status_code == 201 and k.json()["token"].startswith("rsk_")
+    token = k.json()["token"]
+    from fastapi.testclient import TestClient
+
+    from rasad.api.app import app
+
+    anon = TestClient(app)
+    assert anon.get("/api/status").status_code == 401
+    r = anon.get("/api/status", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200 and r.json()["licence"]["mode"] in ("evaluation", "licensed", "grace")
+    assert anon.post("/api/alerts/ack-all", headers={"Authorization": f"Bearer {token}"}).status_code == 403  # viewer key
+    assert admin_client.delete(f"/api/keys/{k.json()['id']}").json()["revoked_at"]
+    assert anon.get("/api/status", headers={"Authorization": f"Bearer {token}"}).status_code == 401
+    st = admin_client.put("/api/settings", json={"values": {"org_name": "Test Org", "marking": "RESTRICTED"}}).json()
+    assert st["org_name"] == "Test Org" and st["marking"] == "RESTRICTED"
+    assert client.get("/api/status").json()["marking"] == "RESTRICTED"
+    assert admin_client.put("/api/settings", json={"values": {"nope": "x"}}).status_code == 400
+    for path in ("/api/export/events.csv?days=400", "/api/export/observations.csv", "/api/export/series.csv?name=hormuz_transits", "/api/export/forecasts.csv"):
+        r = client.get(path)
+        assert r.status_code == 200 and r.headers["content-type"].startswith("text/csv"), path
+    assert client.get("/api/export/forecasts.json").json()
+
+
+def test_csrf_header_required(users):
+    from fastapi.testclient import TestClient
+
+    from rasad.api.app import app
+
+    c = TestClient(app)
+    assert c.post("/api/auth/login", json={"username": "ana", "password": users["ana"]}).status_code == 200
+    assert c.get("/api/status").status_code == 200
+    assert c.post("/api/alerts/scan", json={}).status_code == 403
+    assert c.post("/api/alerts/scan", json={}, headers={"X-Rasad-Client": "web"}).status_code == 200

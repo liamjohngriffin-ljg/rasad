@@ -26,6 +26,13 @@ if (-not (Test-Path "rasad.db")) {
 }
 $env:RASAD_STATIC_DIR = (Resolve-Path ".\static").Path
 $env:RASAD_DATA_DIR = (Resolve-Path ".").Path + "\data"
+New-Item -ItemType Directory -Force -Path $env:RASAD_DATA_DIR | Out-Null
+if ((Test-Path "..\licence.json") -and -not (Test-Path "$env:RASAD_DATA_DIR\licence.json")) { Copy-Item "..\licence.json" "$env:RASAD_DATA_DIR\licence.json" }
+if (-not (Test-Path "data\.backfilled")) {
+  Write-Host "== First run: fetching live data (PortWatch, UKMTO, JMIC, UK sanctions, QNA); needs internet, takes a few minutes" -ForegroundColor Cyan
+  & $exe @args0 -m rasad.pipelines.run backfill
+  New-Item -ItemType File -Force -Path "data\.backfilled" | Out-Null
+}
 if (-not $env:RASAD_ADMIN_PASSWORD) { $env:RASAD_ADMIN_PASSWORD = "change-me-on-first-login" }
 Write-Host "== Starting Rasad on http://localhost:8000 (sign in as admin / $env:RASAD_ADMIN_PASSWORD; close this window to stop)" -ForegroundColor Cyan
 Start-Job -ScriptBlock { Start-Sleep -Seconds 4; Start-Process "http://localhost:8000" } | Out-Null

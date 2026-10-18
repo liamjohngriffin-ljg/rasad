@@ -37,7 +37,11 @@ export type Observation = {
 export type Status = {
   version: string; events: number; observations: number; series_points: number; forecasts: number; open_questions: number
   pending_verification: number; synthetic_rows: number; last_commit: string | null; open_alerts: number; marking: string
+  org_name: string; product_name: string; licence: Licence
 }
+export type Licence = { mode: 'licensed' | 'grace' | 'evaluation'; licensee: string; seats: number; features: string[]; expires: string | null; licence_id: string | null; reason: string | null; seats_used?: number; evaluation_seats?: number }
+export type ApiKeyRow = { id: number; name: string; prefix: string; role: string; created_by: string | null; created_at: string; last_used_at: string | null; revoked_at: string | null; token?: string }
+export type Settings = Record<string, string>
 export type AlertRow = { id: number; created_at: string; kind: string; severity: number; question_code: string | null; title_en: string; title_ar: string | null; detail: Record<string, unknown>; acknowledged_by: string | null; acknowledged_at: string | null }
 export type Changes = {
   since: string
@@ -54,7 +58,7 @@ async function get<T>(path: string): Promise<T> {
   return r.json() as Promise<T>
 }
 async function send<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const r = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+  const r = await fetch(path, { method, headers: { 'Content-Type': 'application/json', 'X-Rasad-Client': 'web' }, body: body === undefined ? undefined : JSON.stringify(body) })
   if (!r.ok) {
     let detail = `${r.status}`
     try { const j = await r.json(); detail = typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail) } catch { /* no body */ }
@@ -122,6 +126,13 @@ export const api = {
   search: (q: string, days = 365, kind = 'all') => get<SearchResult>(`/api/search?q=${encodeURIComponent(q)}&days=${days}&kind=${kind}`),
   document: (id: number) => get<DocRow & { text: string; events: { id: number; event_type: string; event_date: string; verification: string; description_en: string }[]; observations: { id: number; actor: string; issue: string; score: number; verification: string }[] }>(`/api/documents/${id}`),
   questionDocuments: (code: string, days = 14) => get<{ question: string; terms: string[]; documents: DocRow[] }>(`/api/questions/${code}/documents?days=${days}`),
+  licence: () => get<Licence>('/api/licence'),
+  installLicence: (document: unknown) => post<Licence>('/api/licence', { document }),
+  keys: () => get<ApiKeyRow[]>('/api/keys'),
+  createKey: (name: string, role: string) => post<ApiKeyRow>('/api/keys', { name, role }),
+  revokeKey: (id: number) => del<ApiKeyRow>(`/api/keys/${id}`),
+  settings: () => get<Settings>('/api/settings'),
+  saveSettings: (values: Settings) => put<Settings>('/api/settings', { values }),
 }
 
 export type CalibrationData = {

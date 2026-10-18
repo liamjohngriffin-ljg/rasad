@@ -14,7 +14,7 @@ export default function Account() {
       {me?.must_change_password && <div className="text-[var(--accent)] text-sm mb-3">{t('mustChangeHint')}</div>}
       <form className="grid gap-2 mt-3" onSubmit={async (e) => {
         e.preventDefault()
-        const r = await fetch('/api/auth/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ current_password: cur, new_password: nw }) })
+        const r = await fetch('/api/auth/password', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Rasad-Client': 'web' }, body: JSON.stringify({ current_password: cur, new_password: nw }) })
         setMsg(r.ok ? t('passwordUpdated') : (await r.json()).detail)
         if (r.ok) { setCur(''); setNw(''); refresh() }
       }}>

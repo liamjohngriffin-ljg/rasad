@@ -4,7 +4,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..auth import core as auth
@@ -94,6 +94,12 @@ def list_users(db: Session = Depends(get_session), _: User = Depends(require_rol
 
 @router.post("/users")
 def add_user(req: UserIn, request: Request, db: Session = Depends(get_session), admin: User = Depends(require_role("admin"))) -> dict:
+    from .. import licence
+
+    st = licence.current()
+    active = db.scalar(select(func.count(User.id)).where(User.active.is_(True))) or 0
+    if active >= st.seats:
+        raise HTTPException(403, f"seat limit reached ({st.seats} seats, {st.mode} mode); install a licence with more seats")
     if req.role not in ROLES:
         raise HTTPException(400, f"role must be one of {ROLES}")
     if len(req.password) < 10:

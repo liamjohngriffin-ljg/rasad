@@ -10,4 +10,4 @@ Layers, bottom up:
   api/         FastAPI surface used by the front end
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

@@ -16,12 +16,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
   useEffect(() => { refresh() }, [refresh])
   const login = async (username: string, password: string) => {
-    const r = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) })
+    const r = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Rasad-Client': 'web' }, body: JSON.stringify({ username, password }) })
     if (!r.ok) { try { return (await r.json()).detail as string } catch { return `${r.status}` } }
     setMe(await r.json())
     return null
   }
-  const logout = async () => { await fetch('/api/auth/logout', { method: 'POST' }); setMe(null) }
+  const logout = async () => { await fetch('/api/auth/logout', { method: 'POST', headers: { 'X-Rasad-Client': 'web' } }); setMe(null) }
   return <Ctx.Provider value={{ me, loading, login, logout, refresh }}>{children}</Ctx.Provider>
 }
 

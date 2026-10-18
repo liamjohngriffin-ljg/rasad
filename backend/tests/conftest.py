@@ -9,6 +9,20 @@ os.environ.setdefault("RASAD_MODEL_PROVIDER", "rules")
 os.environ.setdefault("RASAD_SECRET", "test-secret")
 os.environ.setdefault("RASAD_ADMIN_PASSWORD", "bootstrap-admin-pw")
 
+# a throwaway vendor key so the suite runs licensed (the real vendor key never enters the repo)
+import json as _json  # noqa: E402
+import tempfile as _tempfile  # noqa: E402
+
+_lic_dir = _tempfile.mkdtemp(prefix="rasad-lic-")
+from rasad import licence as _licence  # noqa: E402
+
+_pub = _licence.keygen(os.path.join(_lic_dir, "vendor.key"))
+os.environ["RASAD_VENDOR_PUBLIC_KEY"] = _pub
+_licence.VENDOR_PUBLIC_KEY_B64 = _pub
+with open(os.path.join(_lic_dir, "licence.json"), "w", encoding="utf-8") as _f:
+    _json.dump(_licence.issue(os.path.join(_lic_dir, "vendor.key"), licensee="Test suite", seats=50, expires="2099-01-01", features=["core", "arabic", "api", "model", "export"]), _f)
+os.environ["RASAD_LICENCE_FILE"] = os.path.join(_lic_dir, "licence.json")
+
 from rasad.db import reset_engine_for_tests, session_factory  # noqa: E402
 from rasad.seed import load as seed_load  # noqa: E402
 
@@ -53,7 +67,7 @@ def _client_as(username: str, password: str):
 
     from rasad.api.app import app
 
-    c = TestClient(app)
+    c = TestClient(app, headers={"X-Rasad-Client": "tests"})
     r = c.post("/api/auth/login", json={"username": username, "password": password})
     assert r.status_code == 200, r.text
     return c
@@ -81,4 +95,4 @@ def anon_client(seeded_db_url, users):
 
     from rasad.api.app import app
 
-    return TestClient(app)
+    return TestClient(app, headers={"X-Rasad-Client": "tests"})

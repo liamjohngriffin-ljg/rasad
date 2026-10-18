@@ -38,6 +38,13 @@ const STR = {
     today: 'Today', alerts: 'Alerts', acknowledge: 'Acknowledge', ackAll: 'Acknowledge all', noAlerts: 'No open alerts.', since: 'since', moves: 'Forecast moves', newEvents: 'New events',
     newDocs: 'new documents', newObs: 'new observations', search: 'Search', searchPlaceholder: 'Search events, statements and documents', documents: 'Documents', relatedDocs: 'Related documents',
     routedBy: 'routed by', downloadWord: 'Word', scan: 'Scan now', readDoc: 'Read', close: 'Close', noResults: 'No results.', flips: 'indicator changes',
+    admin: 'Administration', licenceTitle: 'Licence', licensee: 'Licensee', seats: 'Seats', features: 'Features', expires: 'Expires', mode: 'Mode', installLicence: 'Install licence file',
+    licenceHint: 'Paste the licence file issued to your organisation. It is verified against the vendor key before it is installed.',
+    evaluationBanner: 'Evaluation mode: full functionality, limited seats. Install a licence under Administration.', graceBanner: 'The licence has expired; a grace period is running.',
+    apiKeys: 'API keys', keyName: 'Key name', createKey: 'Create key', revoke: 'Revoke', keyShownOnce: 'Copy this key now; it is not shown again.', lastUsed: 'last used', revoked: 'revoked',
+    settingsTitle: 'Branding and defaults', orgName: 'Organisation name', productName: 'Product name', marking: 'Marking', accent: 'Accent colour', logo: 'Logo (PNG or SVG, under 200 KB)',
+    exports: 'Exports', exportHint: 'CSV with UTF-8 byte-order mark (opens in Excel); the forecast log is also available as JSON for independent verification.',
+    integrationsHint: 'Use a key as a bearer token: Authorization: Bearer rsk_… on any API call. Viewer keys read; analyst keys may write evidence and acknowledge alerts.',
   },
   ar: {
     app: 'رصد', board: 'اللوحة', positions: 'سجل المواقف', calibration: 'السجل', queue: 'التحقق', sources: 'المصادر',
@@ -74,6 +81,13 @@ const STR = {
     today: 'اليوم', alerts: 'التنبيهات', acknowledge: 'تأكيد الاطلاع', ackAll: 'تأكيد الكل', noAlerts: 'لا تنبيهات مفتوحة.', since: 'منذ', moves: 'تحركات التقديرات', newEvents: 'أحداث جديدة',
     newDocs: 'وثائق جديدة', newObs: 'ملاحظات جديدة', search: 'بحث', searchPlaceholder: 'ابحث في الأحداث والتصريحات والوثائق', documents: 'الوثائق', relatedDocs: 'وثائق ذات صلة',
     routedBy: 'وُجّهت بواسطة', downloadWord: 'وورد', scan: 'فحص الآن', readDoc: 'قراءة', close: 'إغلاق', noResults: 'لا نتائج.', flips: 'تغيرات المؤشرات',
+    admin: 'الإدارة', licenceTitle: 'الترخيص', licensee: 'المرخَّص له', seats: 'المقاعد', features: 'الميزات', expires: 'ينتهي', mode: 'الوضع', installLicence: 'تثبيت ملف الترخيص',
+    licenceHint: 'الصق ملف الترخيص الصادر لمؤسستك. يُتحقق منه مقابل مفتاح المورّد قبل التثبيت.',
+    evaluationBanner: 'وضع التقييم: كامل الوظائف بعدد مقاعد محدود. ثبّت الترخيص من صفحة الإدارة.', graceBanner: 'انتهى الترخيص؛ فترة السماح جارية.',
+    apiKeys: 'مفاتيح الواجهة البرمجية', keyName: 'اسم المفتاح', createKey: 'إنشاء مفتاح', revoke: 'إلغاء', keyShownOnce: 'انسخ المفتاح الآن؛ لن يُعرض مرة أخرى.', lastUsed: 'آخر استخدام', revoked: 'ملغى',
+    settingsTitle: 'الهوية والإعدادات الافتراضية', orgName: 'اسم المؤسسة', productName: 'اسم المنتج', marking: 'التصنيف', accent: 'اللون المميز', logo: 'الشعار (PNG أو SVG، أقل من 200 كيلوبايت)',
+    exports: 'التصدير', exportHint: 'ملفات CSV بترميز UTF-8 تُفتح في إكسل؛ سجل التقديرات متاح أيضاً بصيغة JSON للتحقق المستقل.',
+    integrationsHint: 'استخدم المفتاح كرمز حامل: Authorization: Bearer rsk_… في أي نداء. مفاتيح المشاهدة تقرأ؛ مفاتيح المحلل تكتب الأدلة وتؤكد التنبيهات.',
   },
 } as const
 

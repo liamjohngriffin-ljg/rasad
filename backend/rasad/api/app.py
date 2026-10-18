@@ -36,7 +36,8 @@ from ..models import (
     ThreatEvent,
 )
 from ..policy import book as policy_book
-from . import auth_routes, daily_routes, workflow_routes
+from . import admin_routes, auth_routes, daily_routes, workflow_routes
+from .. import licence
 from .deps import client_ip, current_user, require_role
 
 app = FastAPI(title="Rasad API", version=__version__)
@@ -45,6 +46,7 @@ app.add_middleware(CORSMiddleware, allow_origins=_dev_origins, allow_credentials
 app.include_router(auth_routes.router)
 app.include_router(workflow_routes.router)
 app.include_router(daily_routes.router)
+app.include_router(admin_routes.router)
 PUBLIC_RECORD = os.getenv("RASAD_PUBLIC_RECORD", "false").lower() in ("1", "true", "yes")
 
 
@@ -87,7 +89,10 @@ def status(db: Session = Depends(get_session), user: User = Depends(current_user
         "synthetic_rows": synthetic,
         "last_commit": last.isoformat() if last else None,
         "open_alerts": db.scalar(select(func.count(Alert.id)).where(Alert.acknowledged_at.is_(None))) or 0,
-        "marking": os.getenv("RASAD_MARKING", "OFFICIAL"),
+        "marking": admin_routes.get_setting(db, "marking"),
+        "org_name": admin_routes.get_setting(db, "org_name"),
+        "product_name": admin_routes.get_setting(db, "product_name"),
+        "licence": licence.current().as_dict(),
     }
 
 

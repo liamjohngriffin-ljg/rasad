@@ -39,3 +39,31 @@ class AuditLog(Base):
     target: Mapped[str | None] = mapped_column(String(200))
     detail: Mapped[dict] = mapped_column(JSON, default=dict)
     ip: Mapped[str | None] = mapped_column(String(64))
+
+
+class ApiKey(Base):
+    """Bearer tokens for integrations (BI tools, SIEM, scripts). The plaintext is shown once;
+    only its SHA-256 is stored. A key acts as a user with the given role."""
+
+    __tablename__ = "api_keys"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    prefix: Mapped[str] = mapped_column(String(12), index=True)
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    role: Mapped[str] = mapped_column(String(16), default="viewer")
+    created_by: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class Setting(Base):
+    """Operator-editable settings (branding, marking, defaults), keyed strings with JSON values."""
+
+    __tablename__ = "settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_by: Mapped[str | None] = mapped_column(String(64))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)

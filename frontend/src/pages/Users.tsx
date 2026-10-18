@@ -5,7 +5,7 @@ type U = { id: number; username: string; display_name: string; role: string; act
 type Audit = { id: number; at: string; user: string | null; action: string; target: string | null; detail: Record<string, unknown>; ip: string | null }
 
 async function j<T>(path: string, init?: RequestInit): Promise<T> {
-  const r = await fetch(path, { ...init, headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) } })
+  const r = await fetch(path, { ...init, headers: { 'Content-Type': 'application/json', 'X-Rasad-Client': 'web', ...(init?.headers || {}) } })
   if (!r.ok) throw new Error((await r.json().catch(() => ({ detail: r.status }))).detail)
   return r.json()
 }
