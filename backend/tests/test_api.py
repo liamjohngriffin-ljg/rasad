@@ -159,3 +159,16 @@ def test_csrf_header_required(users):
     assert c.get("/api/status").status_code == 200
     assert c.post("/api/alerts/scan", json={}).status_code == 403
     assert c.post("/api/alerts/scan", json={}, headers={"X-Rasad-Client": "web"}).status_code == 200
+
+
+def test_sources_freshness_series_index_and_bulk_verify(client):
+    src = client.get("/api/sources").json()
+    assert src and all("documents" in s and "last_fetched" in s for s in src)
+    idx = client.get("/api/series").json()
+    assert any(r["series"] == "hormuz_transits" and r["points"] > 500 and r["synthetic"] == 0 for r in idx)
+    q = client.get("/api/verification/queue").json()
+    ids = [e["id"] for e in q["events"][:3]]
+    if ids:
+        r = client.post("/api/verification/bulk", json={"kind": "event", "ids": ids, "decision": "verified"}).json()
+        assert r["n"] == len(ids)
+    assert client.post("/api/verification/bulk", json={"kind": "event", "ids": [], "decision": "maybe"}).status_code == 400

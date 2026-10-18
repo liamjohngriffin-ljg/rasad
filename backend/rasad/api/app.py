@@ -23,6 +23,7 @@ from ..models import (
     Actor,
     Alert,
     Brief,
+    Document,
     Forecast,
     Indicator,
     IndicatorState,
@@ -234,10 +235,32 @@ def series(name: str, days: int = 365, as_of: str | None = None, db: Session = D
 
 @app.get("/api/sources")
 def sources(db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
-    return [
-        {"code": s.code, "name": s.name, "tier": s.tier, "kind": s.kind, "url": s.url, "language": s.language, "licence_note": s.licence_note, "reuse_ok": s.reuse_ok}
-        for s in db.scalars(select(Source).order_by(Source.tier, Source.code)).all()
-    ]
+    doc_stats = {
+        sid: (n, last_fetch, last_pub)
+        for sid, n, last_fetch, last_pub in db.execute(select(Document.source_id, func.count(Document.id), func.max(Document.fetched_at), func.max(Document.published_at)).group_by(Document.source_id))
+    }
+    out = []
+    for s in db.scalars(select(Source).order_by(Source.tier, Source.code)).all():
+        n, last_fetch, last_pub = doc_stats.get(s.id, (0, None, None))
+        out.append({
+            "code": s.code, "name": s.name, "tier": s.tier, "kind": s.kind, "url": s.url, "language": s.language, "licence_note": s.licence_note, "reuse_ok": s.reuse_ok,
+            "documents": n, "last_fetched": last_fetch.isoformat(timespec="minutes") if last_fetch else None, "last_published": last_pub.isoformat()[:10] if last_pub else None,
+        })
+    return out
+
+
+@app.get("/api/series")
+def series_index(db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
+    """Every series with its span, point count and how much of it is synthetic: the data freshness view."""
+    rows = db.execute(
+        select(SeriesPoint.series, func.count(SeriesPoint.id), func.min(SeriesPoint.date), func.max(SeriesPoint.date), func.sum(SeriesPoint.is_synthetic), func.max(SeriesPoint.unit))
+        .group_by(SeriesPoint.series).order_by(SeriesPoint.series)
+    ).all()
+    out = []
+    for name, n, lo, hi, synth, unit in rows:
+        latest = db.scalar(select(SeriesPoint).where(SeriesPoint.series == name).order_by(SeriesPoint.date.desc()).limit(1))
+        out.append({"series": name, "points": n, "first": lo.isoformat(), "last": hi.isoformat(), "synthetic": int(synth or 0), "unit": unit, "latest_value": latest.value if latest else None, "latest_source": latest.source if latest else None, "days_stale": (date.today() - hi).days})
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -403,6 +426,28 @@ class Decision(BaseModel):
     decision: str  # verified | rejected
     by: str
     score: float | None = None  # analysts may correct a stance score when verifying an observation
+
+
+class BulkDecision(BaseModel):
+    kind: str
+    ids: list[int]
+    decision: str
+
+
+@app.post("/api/verification/bulk")
+def verify_bulk(req: BulkDecision, db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))) -> dict:
+    if req.decision not in ("verified", "rejected"):
+        raise HTTPException(400, "decision must be verified or rejected")
+    model = ThreatEvent if req.kind == "event" else PolicyObservation if req.kind == "observation" else None
+    if model is None:
+        raise HTTPException(400, "kind must be event or observation")
+    n = 0
+    for row in db.scalars(select(model).where(model.id.in_(req.ids[:500]), model.verification == "pending")):
+        row.verification, row.verified_by, row.verified_at = req.decision, user.username, datetime.utcnow()
+        n += 1
+    db.commit()
+    auth.audit(db, user, f"{req.kind}_bulk_{req.decision}", None, {"n": n})
+    return {"kind": req.kind, "decision": req.decision, "n": n}
 
 
 @app.post("/api/verification/{kind}/{item_id}")

@@ -39,6 +39,7 @@ services:
       RASAD_DIGEST_TO: ${RASAD_DIGEST_TO:-}
       RASAD_PUBLIC_URL: ${RASAD_PUBLIC_URL:-}
       RASAD_PIPELINE_TIME: ${RASAD_PIPELINE_TIME:-06:00}
+      RASAD_POLL_INTERVAL_HOURS: ${RASAD_POLL_INTERVAL_HOURS:-4}
       TZ: ${TZ:-Asia/Dubai}
     volumes:
       - rasad_data:/data
@@ -70,6 +71,7 @@ services:
     environment:
       <<: *api_env
       RASAD_PIPELINE_TIME: ${RASAD_PIPELINE_TIME:-06:00}
+      RASAD_POLL_INTERVAL_HOURS: ${RASAD_POLL_INTERVAL_HOURS:-4}
       RASAD_PIPELINE_RUN_ON_START: "false"
     volumes:
       - rasad_data:/data

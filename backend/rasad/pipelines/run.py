@@ -99,10 +99,14 @@ def poll(*, backfill: bool = False) -> dict:
     return report
 
 
-def extract() -> dict:
+def extract(limit: int | None = None) -> dict:
+    """Rules extraction is cheap, so the whole backlog goes in one run; a model provider works
+    in batches of RASAD_EXTRACT_BATCH (default 200) so a stalled endpoint cannot hold the day."""
     db = session_factory()()
     try:
-        return extraction.process_pending(db)
+        if limit is None:
+            limit = 100000 if get_settings().model_provider == "rules" else int(os.getenv("RASAD_EXTRACT_BATCH", "200"))
+        return extraction.process_pending(db, limit=limit)
     finally:
         db.close()
 
