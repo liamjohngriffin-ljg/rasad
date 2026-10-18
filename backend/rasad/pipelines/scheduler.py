@@ -25,7 +25,7 @@ def _next_run(now: datetime, hhmm: str) -> datetime:
 
 
 def run_once() -> None:
-    for name, fn in (("poll", pipeline.poll), ("extract", pipeline.extract), ("commit", pipeline.commit)):
+    for name, fn in (("poll", pipeline.poll), ("extract", pipeline.extract), ("commit", pipeline.commit), ("digest", pipeline.digest)):
         try:
             print(f"[{datetime.now().isoformat(timespec='seconds')}] {name}: {fn()}", flush=True)
         except Exception:  # noqa: BLE001

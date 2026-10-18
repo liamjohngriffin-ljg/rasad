@@ -15,11 +15,13 @@ from ..auth import core as auth
 from ..auth.models import User
 from ..briefs import generate as briefs
 from ..db import get_session, init_db, session_factory
+from ..engine import alerts as alert_engine
 from ..engine import run as engine_run
 from ..engine import scoring
 from ..engine.commitment import verify_chain
 from ..models import (
     Actor,
+    Alert,
     Brief,
     Forecast,
     Indicator,
@@ -34,7 +36,7 @@ from ..models import (
     ThreatEvent,
 )
 from ..policy import book as policy_book
-from . import auth_routes, workflow_routes
+from . import auth_routes, daily_routes, workflow_routes
 from .deps import client_ip, current_user, require_role
 
 app = FastAPI(title="Rasad API", version=__version__)
@@ -42,6 +44,7 @@ _dev_origins = [o.strip() for o in os.getenv("RASAD_CORS_ORIGINS", "http://local
 app.add_middleware(CORSMiddleware, allow_origins=_dev_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.include_router(auth_routes.router)
 app.include_router(workflow_routes.router)
+app.include_router(daily_routes.router)
 PUBLIC_RECORD = os.getenv("RASAD_PUBLIC_RECORD", "false").lower() in ("1", "true", "yes")
 
 
@@ -83,6 +86,8 @@ def status(db: Session = Depends(get_session), user: User = Depends(current_user
         + (db.scalar(select(func.count(PolicyObservation.id)).where(PolicyObservation.verification == "pending")) or 0),
         "synthetic_rows": synthetic,
         "last_commit": last.isoformat() if last else None,
+        "open_alerts": db.scalar(select(func.count(Alert.id)).where(Alert.acknowledged_at.is_(None))) or 0,
+        "marking": os.getenv("RASAD_MARKING", "OFFICIAL"),
     }
 
 
@@ -328,7 +333,8 @@ class CommitRequest(BaseModel):
 def commit_forecasts(req: CommitRequest, db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))) -> dict:
     d = _as_of(req.as_of)
     out = engine_run.commit_all_open(db, d)
-    auth.audit(db, user, "forecasts_committed", d.isoformat(), {"n": len(out)})
+    raised = alert_engine.after_commit(db, out)
+    auth.audit(db, user, "forecasts_committed", d.isoformat(), {"n": len(out), "alerts": raised})
     return {"as_of": d.isoformat(), "committed": [{"question": f.question.code, "final_prob": f.final_prob, "commit_hash": f.commit_hash} for f in out]}
 
 

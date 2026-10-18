@@ -1,9 +1,26 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { api, type IndicatorDetail, type PanelView, type QuestionDetail } from '../api'
+import { api, type DocRow, type IndicatorDetail, type PanelView, type QuestionDetail } from '../api'
 import { atLeast, useAuth } from '../auth'
 import { Delta, DemoTag, Prob, Sparkline, StateTag } from '../components'
 import { pct, useLang } from '../i18n'
+import { DocCard, DocViewer } from './Search'
+
+function RelatedDocs({ code }: { code: string }) {
+  const { t } = useLang()
+  const [docs, setDocs] = useState<{ terms: string[]; documents: DocRow[] } | null>(null)
+  const [open, setOpen] = useState<number | null>(null)
+  useEffect(() => { api.questionDocuments(code, 30).then(setDocs) }, [code])
+  return (
+    <div className="card p-5">
+      <h2 className="font-medium mb-1">{t('relatedDocs')} <span className="muted text-sm">{docs?.documents.length ?? ''}</span></h2>
+      {docs && <div className="muted text-[11px] mb-2">{t('routedBy')}: {docs.terms.join(', ')}</div>}
+      {docs?.documents.slice(0, 12).map((d) => <DocCard key={d.id} d={d} onOpen={setOpen} />)}
+      {docs && docs.documents.length === 0 && <div className="muted text-sm">{t('noResults')}</div>}
+      {open != null && <DocViewer id={open} onClose={() => setOpen(null)} />}
+    </div>
+  )
+}
 
 function PanelBlock({ code, open }: { code: string; open: boolean }) {
   const { t } = useLang()
@@ -133,6 +150,7 @@ export default function Question() {
       </div>
 
       <PanelBlock code={q.code} open={q.status === 'open'} />
+      <RelatedDocs code={q.code} />
 
       <div className="grid md:grid-cols-2 gap-4">
         <div className="card p-5"><h2 className="font-medium mb-2">{t('decisions')}</h2><ul className="list-disc ps-5 text-sm">{q.decision_hooks.map((h) => <li key={h}>{h}</li>)}</ul></div>

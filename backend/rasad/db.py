@@ -52,7 +52,28 @@ def get_session() -> Iterator[Session]:
 def init_db() -> None:
     from . import models  # noqa: F401  (registers tables)
 
-    Base.metadata.create_all(get_engine())
+    engine = get_engine()
+    Base.metadata.create_all(engine)
+    _add_missing_columns(engine)
+
+
+def _add_missing_columns(engine) -> None:
+    """Forward-only schema catch-up for columns added after a database was created. Tables
+    come from create_all; columns added to an existing table are appended here with their
+    declared type and no constraint, which is what every release so far has needed."""
+    from sqlalchemy import inspect, text
+
+    insp = inspect(engine)
+    with engine.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            if not insp.has_table(table.name):
+                continue
+            have = {c["name"] for c in insp.get_columns(table.name)}
+            for col in table.columns:
+                if col.name in have:
+                    continue
+                ctype = col.type.compile(dialect=engine.dialect)
+                conn.execute(text(f'ALTER TABLE {table.name} ADD COLUMN "{col.name}" {ctype}'))
 
 
 def reset_engine_for_tests(url: str) -> None:

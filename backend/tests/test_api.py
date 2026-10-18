@@ -95,3 +95,26 @@ def test_workflow_question_indicator_panel_resolution(client):
     assert client.put("/api/questions/test_q_90", json={"base_rate": 0.3}).status_code == 409
     cal = client.get("/api/calibration").json()
     assert any(x["code"] == "test_q_90" for x in cal["resolved"])
+
+
+def test_daily_alerts_changes_search_docx(client):
+    scan = client.post("/api/alerts/scan").json()
+    assert "raised" in scan
+    al = client.get("/api/alerts").json()
+    assert isinstance(al, list)
+    ch = client.get("/api/changes?since=2026-10-01").json()
+    assert ch["since"] == "2026-10-01" and "moves" in ch and "events" in ch
+    s = client.get("/api/search?q=Hormuz&days=400").json()
+    assert s["events"] or s["documents"] or s["observations"]
+    docs = client.get("/api/questions/hormuz_closure_90/documents?days=3650").json()
+    assert "terms" in docs and "hormuz" in docs["terms"]
+    r = client.get("/api/briefs/hormuz_closure_90/docx?lang=en&as_of=2026-10-18&polish=false")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("application/vnd.openxmlformats") and len(r.content) > 5000
+    r2 = client.get("/api/briefs/hormuz_closure_90/docx?lang=ar&as_of=2026-10-18&polish=false")
+    assert r2.status_code == 200
+    if al:
+        a = client.post(f"/api/alerts/{al[0]['id']}/ack").json()
+        assert a["acknowledged_by"]
+    assert client.post("/api/alerts/ack-all").json()["acknowledged"] >= 0
+    st = client.get("/api/status").json()
+    assert "open_alerts" in st and "marking" in st

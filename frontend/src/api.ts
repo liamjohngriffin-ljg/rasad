@@ -36,8 +36,17 @@ export type Observation = {
 }
 export type Status = {
   version: string; events: number; observations: number; series_points: number; forecasts: number; open_questions: number
-  pending_verification: number; synthetic_rows: number; last_commit: string | null
+  pending_verification: number; synthetic_rows: number; last_commit: string | null; open_alerts: number; marking: string
 }
+export type AlertRow = { id: number; created_at: string; kind: string; severity: number; question_code: string | null; title_en: string; title_ar: string | null; detail: Record<string, unknown>; acknowledged_by: string | null; acknowledged_at: string | null }
+export type Changes = {
+  since: string
+  moves: { code: string; title_en: string; title_ar: string | null; from: number | null; to: number; delta_points: number; as_of: string; flips: { indicator: string; from: string | null; to: string }[] }[]
+  events: { id: number; event_date: string; event_type: string; country: string | null; severity: number; description_en: string; description_ar: string | null; verification: string; source: string | null }[]
+  new_observations: number; new_documents: number; alerts: AlertRow[]
+}
+export type DocRow = { id: number; source: string; source_name: string; external_id: string; title: string | null; url: string | null; language: string; published_at: string | null; fetched_at: string; status: string; meta: Record<string, unknown>; snippet: string; score?: number }
+export type SearchResult = { q: string; events: EventRow[]; observations: Observation[]; documents: DocRow[] }
 
 async function get<T>(path: string): Promise<T> {
   const r = await fetch(path)
@@ -105,6 +114,14 @@ export const api = {
   createEvent: (e: Record<string, unknown>) => post<{ id: number }>('/api/events', e),
   createObservation: (o: Record<string, unknown>) => post<{ id: number }>('/api/observations', o),
   addSeriesPoint: (p: { series: string; date: string; value: number; unit: string; source: string }) => post('/api/series', p),
+  alerts: (all = false) => get<AlertRow[]>(`/api/alerts?all=${all}`),
+  ackAlert: (id: number) => post<AlertRow>(`/api/alerts/${id}/ack`, {}),
+  ackAll: () => post<{ acknowledged: number }>('/api/alerts/ack-all', {}),
+  scanAlerts: () => post<{ raised: number }>('/api/alerts/scan', {}),
+  changes: (since?: string) => get<Changes>(`/api/changes${since ? `?since=${since}` : ''}`),
+  search: (q: string, days = 365, kind = 'all') => get<SearchResult>(`/api/search?q=${encodeURIComponent(q)}&days=${days}&kind=${kind}`),
+  document: (id: number) => get<DocRow & { text: string; events: { id: number; event_type: string; event_date: string; verification: string; description_en: string }[]; observations: { id: number; actor: string; issue: string; score: number; verification: string }[] }>(`/api/documents/${id}`),
+  questionDocuments: (code: string, days = 14) => get<{ question: string; terms: string[]; documents: DocRow[] }>(`/api/questions/${code}/documents?days=${days}`),
 }
 
 export type CalibrationData = {

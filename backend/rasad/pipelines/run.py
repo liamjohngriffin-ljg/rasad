@@ -3,7 +3,8 @@
   python -m rasad.pipelines.run poll        fetch every configured feed (runs on the host that may reach the sources)
   python -m rasad.pipelines.run extract     turn ingested documents into pending events and observations
   python -m rasad.pipelines.run commit      commit today's forecasts to the chain
-  python -m rasad.pipelines.run daily       all three, in order
+  python -m rasad.pipelines.run daily       all three, in order, then the alert digest
+  python -m rasad.pipelines.run digest      email unacknowledged alerts (RASAD_SMTP_HOST, RASAD_DIGEST_TO)
   python -m rasad.pipelines.run backfill    first run: PortWatch since 2024, every MSCIO folder, the sanctions lists
   python -m rasad.pipelines.run ingest-dir <path> [folder]   ingest a directory of PDFs (air-gapped hosts)
   python -m rasad.pipelines.run snapshot [path]              export real ledger rows to the seed snapshot
@@ -22,6 +23,7 @@ import yaml
 
 from ..config import get_settings
 from ..db import init_db, session_factory
+from ..engine import alerts as alert_engine
 from ..engine import run as engine_run
 from ..extraction import service as extraction
 from .connectors import gdelt, jmic, jwc, mscio, portwatch, rss_wires, sanctions, state_fms, uk_sanctions, ukmto
@@ -91,6 +93,7 @@ def poll(*, backfill: bool = False) -> dict:
             _try(report, f"jmic:{url.rsplit('/', 1)[-1]}", lambda u=url: jmic.fetch_and_ingest(db, u)["week"])
         for code in cfg.get("rss") or []:
             _try(report, f"rss_{code}", lambda c=code: rss_wires.fetch_and_ingest(db, c, allow_sanctioned=bool(cfg.get("allow_sanctioned_feeds"))))
+        _try(report, "alerts", lambda: alert_engine.after_poll(db))
     finally:
         db.close()
     return report
@@ -108,7 +111,16 @@ def commit(as_of: date | None = None) -> dict:
     db = session_factory()()
     try:
         out = engine_run.commit_all_open(db, as_of or date.today())
-        return {f.question.code: f.final_prob for f in out}
+        raised = alert_engine.after_commit(db, out)
+        return {"alerts": raised, **{f.question.code: f.final_prob for f in out}}
+    finally:
+        db.close()
+
+
+def digest() -> dict:
+    db = session_factory()()
+    try:
+        return alert_engine.send_digest(db)
     finally:
         db.close()
 
@@ -146,6 +158,9 @@ def main(argv: list[str]) -> None:
         print(poll())
         print(extract())
         print(commit())
+        print(digest())
+    elif cmd == "digest":
+        print(digest())
     elif cmd == "ingest-dir":
         print(ingest_dir(argv[1], argv[2] if len(argv) > 2 else "local"))
     elif cmd == "snapshot":

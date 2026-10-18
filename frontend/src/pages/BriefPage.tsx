@@ -15,6 +15,7 @@ export default function BriefPage() {
         <Link className="btn" to={`/q/${code}`}>←</Link>
         <span className="muted">{t('brief')}</span>
         {brief && <span className="muted ms-auto text-xs">{t('generator')} {brief.generator} · {brief.generated_at.slice(0, 16)}</span>}
+        <a className="btn" href={`/api/briefs/${code}/docx?lang=${lang}`}>{t('downloadWord')}</a>
         <button className="btn" onClick={() => window.print()}>PDF</button>
       </div>
       <div className="card p-8">{brief ? <Markdown md={brief.content_md} /> : <div className="muted">…</div>}</div>

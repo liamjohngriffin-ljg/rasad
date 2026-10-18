@@ -68,6 +68,7 @@ class Document(Base):
     sha256: Mapped[str | None] = mapped_column(String(64))
     raw_text: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(24), default="ingested")  # ingested, extracted, reviewed
+    meta: Mapped[dict | None] = mapped_column(JSON, default=dict)  # connector hints: question_codes, folder, domain
 
     source: Mapped[Source] = relationship(back_populates="documents")
 
@@ -129,6 +130,7 @@ class ThreatEvent(Base):
     verified_by: Mapped[str | None] = mapped_column(String(80))
     verified_at: Mapped[datetime | None] = mapped_column(DateTime)
     is_synthetic: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     actor: Mapped[Actor | None] = relationship(foreign_keys=[actor_id])
     target_actor: Mapped[Actor | None] = relationship(foreign_keys=[target_actor_id])
@@ -180,6 +182,7 @@ class PolicyObservation(Base):
     verified_by: Mapped[str | None] = mapped_column(String(80))
     verified_at: Mapped[datetime | None] = mapped_column(DateTime)
     is_synthetic: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     actor: Mapped[Actor] = relationship()
     issue: Mapped[Issue] = relationship()
@@ -322,3 +325,24 @@ class TaskingRequest(Base):
     answered_at: Mapped[datetime | None] = mapped_column(DateTime)
     question_id: Mapped[int | None] = mapped_column(ForeignKey("questions.id"))
     answer_md: Mapped[str | None] = mapped_column(Text)
+
+
+# ---------------------------------------------------------------------------
+# Alerts: what changed, for people who were not watching
+# ---------------------------------------------------------------------------
+
+
+class Alert(Base):
+    __tablename__ = "alerts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, index=True)
+    kind: Mapped[str] = mapped_column(String(32), index=True)  # indicator_flip, forecast_move, severe_event, series_break, chain_broken, resolution_due
+    severity: Mapped[int] = mapped_column(Integer, default=2)  # 1 info, 2 notable, 3 urgent
+    question_code: Mapped[str | None] = mapped_column(String(48), index=True)
+    title_en: Mapped[str] = mapped_column(String(300))
+    title_ar: Mapped[str | None] = mapped_column(String(300))
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)
+    dedupe_key: Mapped[str] = mapped_column(String(200), unique=True)
+    acknowledged_by: Mapped[str | None] = mapped_column(String(80))
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime)

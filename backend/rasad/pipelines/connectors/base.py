@@ -70,7 +70,7 @@ def upsert_document(db: Session, raw: RawDoc) -> tuple[Document, bool]:
     sha = hashlib.sha256(raw.text.encode("utf-8")).hexdigest()
     if existing:
         return existing, False
-    doc = Document(source_id=src.id, external_id=raw.external_id, url=raw.url, title=raw.title, language=raw.language, published_at=raw.published_at, sha256=sha, raw_text=raw.text)
+    doc = Document(source_id=src.id, external_id=raw.external_id, url=raw.url, title=raw.title, language=raw.language, published_at=raw.published_at, sha256=sha, raw_text=raw.text, meta=raw.meta or {})
     db.add(doc)
     db.flush()
     return doc, True

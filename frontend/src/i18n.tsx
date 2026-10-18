@@ -35,6 +35,9 @@ const STR = {
     costClass: 'Cost class', speakerLevel: 'Speaker level', excerpt: 'Excerpt', excerptEn: 'Excerpt (English)', series: 'Series', value: 'Value', unit: 'Unit',
     entered: 'Recorded.', markVerified: 'Enter as verified (I vouch for this source)', frame: 'Frame as question', answer: 'Answer', answerMd: 'Answer (markdown)',
     framed: 'framed', answered: 'answered', requestedBy: 'requested by', newTasking: 'New request', noQuestions: 'No questions yet.', errorPrefix: 'Error',
+    today: 'Today', alerts: 'Alerts', acknowledge: 'Acknowledge', ackAll: 'Acknowledge all', noAlerts: 'No open alerts.', since: 'since', moves: 'Forecast moves', newEvents: 'New events',
+    newDocs: 'new documents', newObs: 'new observations', search: 'Search', searchPlaceholder: 'Search events, statements and documents', documents: 'Documents', relatedDocs: 'Related documents',
+    routedBy: 'routed by', downloadWord: 'Word', scan: 'Scan now', readDoc: 'Read', close: 'Close', noResults: 'No results.', flips: 'indicator changes',
   },
   ar: {
     app: 'رصد', board: 'اللوحة', positions: 'سجل المواقف', calibration: 'السجل', queue: 'التحقق', sources: 'المصادر',
@@ -68,6 +71,9 @@ const STR = {
     costClass: 'فئة الكلفة', speakerLevel: 'مستوى المتحدث', excerpt: 'المقتطف', excerptEn: 'المقتطف (إنجليزي)', series: 'السلسلة', value: 'القيمة', unit: 'الوحدة',
     entered: 'تم التسجيل.', markVerified: 'إدخال كموثق (أضمن هذا المصدر)', frame: 'صياغة كسؤال', answer: 'إجابة', answerMd: 'الإجابة (ماركداون)',
     framed: 'مُصاغ', answered: 'مُجاب', requestedBy: 'بطلب من', newTasking: 'طلب جديد', noQuestions: 'لا أسئلة بعد.', errorPrefix: 'خطأ',
+    today: 'اليوم', alerts: 'التنبيهات', acknowledge: 'تأكيد الاطلاع', ackAll: 'تأكيد الكل', noAlerts: 'لا تنبيهات مفتوحة.', since: 'منذ', moves: 'تحركات التقديرات', newEvents: 'أحداث جديدة',
+    newDocs: 'وثائق جديدة', newObs: 'ملاحظات جديدة', search: 'بحث', searchPlaceholder: 'ابحث في الأحداث والتصريحات والوثائق', documents: 'الوثائق', relatedDocs: 'وثائق ذات صلة',
+    routedBy: 'وُجّهت بواسطة', downloadWord: 'وورد', scan: 'فحص الآن', readDoc: 'قراءة', close: 'إغلاق', noResults: 'لا نتائج.', flips: 'تغيرات المؤشرات',
   },
 } as const
 
