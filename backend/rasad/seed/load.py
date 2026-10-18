@@ -53,8 +53,13 @@ def load_questions(db: Session, opened_at: date) -> None:
             )
             db.add(q)
             db.flush()
-            for icode, iname, iname_ar, lrp, lra, polarity, rule in reference.INDICATORS.get(code, []):
-                db.add(Indicator(question_id=q.id, code=icode, name_en=iname, name_ar=iname_ar, lr_present=lrp, lr_absent=lra, polarity=polarity, rule=rule))
+        # indicators added to the reference after a database was created are appended (never overwritten:
+        # an analyst's edits to an existing indicator stand)
+        have = {i.code for i in q.indicators}
+        for icode, iname, iname_ar, lrp, lra, polarity, rule in reference.INDICATORS.get(code, []):
+            if icode in have:
+                continue
+            db.add(Indicator(question_id=q.id, code=icode, name_en=iname, name_ar=iname_ar, lr_present=lrp, lr_absent=lra, polarity=polarity, rule=rule))
     for order, (code, en, ar, horizon, base, criteria, opened, resolved, outcome, notes) in enumerate(reference.RESOLVED_QUESTIONS, start=100):
         q = db.scalar(select(Question).where(Question.code == code))
         if q is None:

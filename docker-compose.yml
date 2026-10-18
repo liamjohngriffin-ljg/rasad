@@ -29,6 +29,16 @@ services:
       RASAD_PUBLIC_RECORD: ${RASAD_PUBLIC_RECORD:-false}
       RASAD_CORS_ORIGINS: ""
       RASAD_DATA_DIR: /data
+      RASAD_MARKING: ${RASAD_MARKING:-OFFICIAL}
+      RASAD_LICENCE_FILE: ${RASAD_LICENCE_FILE:-}
+      RASAD_SMTP_HOST: ${RASAD_SMTP_HOST:-}
+      RASAD_SMTP_PORT: ${RASAD_SMTP_PORT:-587}
+      RASAD_SMTP_USER: ${RASAD_SMTP_USER:-}
+      RASAD_SMTP_PASSWORD: ${RASAD_SMTP_PASSWORD:-}
+      RASAD_SMTP_FROM: ${RASAD_SMTP_FROM:-rasad@localhost}
+      RASAD_DIGEST_TO: ${RASAD_DIGEST_TO:-}
+      RASAD_PUBLIC_URL: ${RASAD_PUBLIC_URL:-}
+      RASAD_PIPELINE_TIME: ${RASAD_PIPELINE_TIME:-06:00}
       TZ: ${TZ:-Asia/Dubai}
     volumes:
       - rasad_data:/data
@@ -103,6 +113,16 @@ services:
     volumes:
       - rasad_data:/data
     command: ["python", "-m", "rasad.pipelines.run", "daily"]
+
+  # First run on a connected host: PortWatch since 2024, the MSCIO library, sanctions, QNA, GDELT.
+  #   docker compose --profile pipeline run --rm backfill
+  backfill:
+    build: .
+    profiles: ["pipeline"]
+    environment: *api_env
+    volumes:
+      - rasad_data:/data
+    command: ["python", "-m", "rasad.pipelines.run", "backfill"]
     depends_on:
       db:
         condition: service_healthy

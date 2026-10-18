@@ -203,7 +203,11 @@ INDICATORS: dict[str, list[tuple]] = {
         ("negotiation_signal", "Iran's stated posture has turned to de-escalation", "موقف إيران المعلن تحول إلى التهدئة", 0.5, 1.2, "not_emerging",
          {"type": "position_level", "actor": "IR", "issue": "hormuz_posture", "track": "stated", "op": "<=", "value": -0.3}),
         ("maritime_attacks_gulf", "Attacks on merchant vessels in the Gulf or Gulf of Oman in the last 21 days", "هجمات على سفن تجارية في الخليج أو خليج عُمان خلال 21 يوماً", 2.0, 0.7, "emerging",
-         {"type": "event_count", "event_types": ["maritime_attack", "seizure", "maritime_harassment"], "countries": ["HORMUZ", "AE", "QA", "OM", "IR"], "window_days": 21, "threshold": 1}),
+         {"type": "event_count", "event_types": ["maritime_attack", "seizure", "maritime_harassment"], "countries": ["HORMUZ", "AE", "QA", "OM", "IR", "ARABIAN_GULF"], "window_days": 21, "threshold": 1}),
+        ("hormuz_attack_tempo", "Three or more reported attacks in the Strait of Hormuz approaches in the last 14 days (UKMTO, MSCIO)", "ثلاث هجمات أو أكثر في مداخل مضيق هرمز خلال 14 يوماً", 2.2, 0.7, "emerging",
+         {"type": "event_count", "event_types": ["maritime_attack"], "countries": ["HORMUZ", "OM", "ARABIAN_GULF"], "window_days": 14, "threshold": 3}),
+        ("jmic_hormuz_critical", "JMIC assesses the Strait of Hormuz at CRITICAL in the last 60 days", "تقييم JMIC لمضيق هرمز عند المستوى الحرج خلال 60 يوماً", 1.8, 0.8, "emerging",
+         {"type": "series_threshold", "series": "jmic_threat_level_hormuz", "op": ">=", "value": 5, "lookback_days": 60}),
     ],
     "red_sea_attacks_60": [
         ("houthi_maritime_attacks", "Houthi attack on a merchant vessel in the last 30 days", "هجوم حوثي على سفينة تجارية خلال 30 يوماً", 3.0, 0.4, "emerging",
@@ -214,6 +218,10 @@ INDICATORS: dict[str, list[tuple]] = {
          {"type": "series_threshold", "series": "war_risk_premium_red_sea_pct", "op": ">=", "value": 0.5, "lookback_days": 60}),
         ("yemen_front_active", "Houthi front against Saudi Arabia active (revealed)", "الجبهة اليمنية ضد السعودية نشطة", 1.5, 0.8, "emerging",
          {"type": "position_level", "actor": "YE-HOUTHI", "issue": "yemen_front", "track": "revealed", "op": ">=", "value": 0.5}),
+        ("red_sea_reported_attacks", "Reported attack on a merchant vessel in the Red Sea, Bab el-Mandeb or Gulf of Aden in the last 30 days (UKMTO, MSCIO)", "هجوم مُبلّغ عنه على سفينة تجارية في البحر الأحمر أو باب المندب أو خليج عدن خلال 30 يوماً", 2.4, 0.5, "emerging",
+         {"type": "event_count", "event_types": ["maritime_attack"], "countries": ["RED_SEA", "GULF_OF_ADEN"], "window_days": 30, "threshold": 1}),
+        ("jmic_red_sea_elevated", "JMIC assesses the Red Sea or Bab el-Mandeb at SUBSTANTIAL or above in the last 45 days", "تقييم JMIC للبحر الأحمر أو باب المندب عند مستوى كبير فأعلى خلال 45 يوماً", 1.7, 0.8, "emerging",
+         {"type": "series_threshold", "series": "jmic_threat_level_bab_al_mandab", "op": ">=", "value": 3, "lookback_days": 45}),
     ],
     "israel_iran_exchange_60": [
         ("israel_strike_posture", "Israel's revealed willingness to strike Iran", "استعداد إسرائيلي ظاهر لضرب إيران", 2.0, 0.6, "emerging",

@@ -1,7 +1,7 @@
 """Indicator rules: how an indicator's state is read from the ledgers on a given day.
 
 Rule types (the `rule` JSON on an Indicator):
-  event_count      {"type":"event_count","event_types":[...],"countries":[...],"actors":[...],
+  event_count      {"type":"event_count","event_types":[...],"countries":[...],"actors":[...],"include_pending_extractions":false,
                     "window_days":14,"threshold":1,"min_severity":1}
   series_threshold {"type":"series_threshold","series":"war_risk_premium_hormuz_pct","op":">=",
                     "value":2.0,"lookback_days":14}
@@ -57,7 +57,16 @@ def _event_count(db: Session, rule: dict, as_of: date) -> EvaluatedState:
     if rule.get("actors"):
         actor_ids = db.scalars(select(Actor.id).where(Actor.code.in_(rule["actors"]))).all()
         stmt = stmt.where(ThreatEvent.actor_id.in_(actor_ids))
-    rows = db.scalars(stmt).all()
+    candidates = db.scalars(stmt).all()
+    # pending rows count only when they come from a source-confirmed connector (grade A or B);
+    # model or lexicon extractions from wires (grade C and below) count once an analyst accepts them
+    rows, excluded = [], 0
+    for r in candidates:
+        grade = str((r.provenance or {}).get("grade", "C3"))[:1].upper()
+        if r.verification == "verified" or grade in ("A", "B") or rule.get("include_pending_extractions"):
+            rows.append(r)
+        else:
+            excluded += 1
     threshold = int(rule.get("threshold", 1))
     return EvaluatedState(
         "present" if len(rows) >= threshold else "absent",
@@ -66,6 +75,7 @@ def _event_count(db: Session, rule: dict, as_of: date) -> EvaluatedState:
             "threshold": threshold,
             "window_days": window,
             "event_ids": [r.id for r in rows][:25],
+            "pending_extractions_excluded": excluded,
             "synthetic_share": round(sum(1 for r in rows if r.is_synthetic) / len(rows), 2) if rows else 0.0,
         },
     )

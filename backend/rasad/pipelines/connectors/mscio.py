@@ -24,7 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ...models import Document, Source
-from . import jmic, jmic_notes, ukmto
+from . import jmic, jmic_notes, mscio_weekly, ukmto
 from .base import RawDoc, cache_path, fetch_bytes, fetch_text, upsert_document
 
 BASE = "https://mscio.eu"
@@ -74,6 +74,8 @@ def classify(filename: str, folder: str) -> str:
         return "jmic_dashboard"
     if "ADVISORY_NOTE" in f or "ADVISORY NOTE" in f or folder == "jmic_advisories":
         return "jmic_note"
+    if "WEEKLY" in f and ("ATALANTA" in f or "ATA_" in f or "MSCIO" in f) or folder == "weekly_threat_assessment":
+        return "mscio_weekly"
     return "document"
 
 
@@ -119,6 +121,8 @@ def ingest_file(db: Session, data: bytes, *, filename: str, url: str, folder: st
     elif kind == "jmic_note":
         counts = jmic_notes.ingest_pdf(db, data, external_id=filename, url=url)
         out.update(counts)
+    elif kind == "mscio_weekly":
+        out.update(mscio_weekly.ingest_text(db, mscio_weekly.read_pdf_text(data), external_id=filename, url=url))
     else:
         text = read_pdf_text(data)
         source_code = "ukmto" if "UKMTO" in filename.upper() else "jmic" if "JMIC" in filename.upper() else "mscio"

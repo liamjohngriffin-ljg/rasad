@@ -1,0 +1,24 @@
+Metadata-Version: 2.4
+Name: rasad
+Version: 0.3.0
+Summary: Rasad: sovereign indicators-and-warnings engine for Gulf national security (working name)
+Requires-Python: >=3.11
+Requires-Dist: fastapi>=0.115
+Requires-Dist: uvicorn[standard]>=0.30
+Requires-Dist: sqlalchemy>=2.0
+Requires-Dist: pydantic>=2.6
+Requires-Dist: pydantic-settings>=2.2
+Requires-Dist: numpy>=1.26
+Requires-Dist: python-dateutil>=2.9
+Requires-Dist: feedparser>=6.0
+Requires-Dist: pdfplumber>=0.11
+Requires-Dist: httpx>=0.27
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: anthropic>=0.40
+Requires-Dist: psycopg[binary]>=3.1
+Requires-Dist: python-docx>=1.1
+Requires-Dist: cryptography>=42
+Provides-Extra: dev
+Requires-Dist: pytest>=8; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23; extra == "dev"
+Requires-Dist: httpx>=0.27; extra == "dev"

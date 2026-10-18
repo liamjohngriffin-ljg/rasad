@@ -119,3 +119,17 @@ def test_ukmto_warning_parse():
     assert p.event_date == date(2026, 4, 21) and p.area == "GULF_OF_ADEN"
     assert p.location == "45NM northeast of Mareeyo, Somalia" and p.source_line == "Military authorities"
     assert p.lat and abs(p.lat - 8.93) < 0.01 and p.lon and abs(p.lon - 50.53) < 0.01
+
+
+def test_mscio_weekly_parse():
+    from rasad.pipelines.connectors import mscio, mscio_weekly
+
+    p = mscio_weekly.parse_report(read("mscio_weekly_sample.txt"), "MSCIO_ATALANTA_WEEKLY_REPORT_09_OCT-16_OCT.pdf")
+    assert p["week_end"] == date(2026, 10, 16) and p["counts"]["total"] == 13 and p["counts"]["attack"] == 12
+    refs = {i["ref"] for i in p["incidents"]}
+    assert "136/26" in refs and "138/26" in refs
+    a136 = next(i for i in p["incidents"] if i["ref"] == "136/26")
+    assert a136["date"] == date(2026, 10, 10) and a136["country"] == "HORMUZ" and a136["category"] == "attack"
+    a138 = next(i for i in p["incidents"] if i["ref"] == "138/26")
+    assert a138["country"] == "OM"
+    assert mscio.classify("MSCIO_ATALANTA_WEEKLY_REPORT_09_OCT-16_OCT.pdf", "weekly_threat_assessment") == "mscio_weekly"
