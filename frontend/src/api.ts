@@ -6,7 +6,7 @@ export type QuestionSummary = {
   as_of: string | null; delta_30d: number; history: HistoryPoint[]; movers: Mover[]; synthetic_share: number; commit_hash: string | null
 }
 export type EventRow = {
-  id: number; event_date: string; event_type: string; location_name: string | null; country: string | null; actor: string | null
+  id: number; event_date: string; event_type: string; location_name: string | null; country: string | null; actor: string | null; lat?: number | null; lon?: number | null
   target: string | null; fatalities: number | null; severity: number; description_en: string; description_ar: string | null
   provenance: Record<string, string>; verification: string; is_synthetic: boolean
 }

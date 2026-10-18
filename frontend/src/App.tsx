@@ -25,6 +25,7 @@ export default function App() {
           <nav className="flex gap-0.5 ms-2 flex-wrap">
             <NavLink to="/" end className={link}>{t('board')}</NavLink>
             <NavLink to="/today" className={link}>{t('today')} {status && status.open_alerts > 0 && <span className="tag present ms-1">{status.open_alerts}</span>}</NavLink>
+            <NavLink to="/map" className={link}>{t('map')}</NavLink>
             <NavLink to="/positions" className={link}>{t('positions')}</NavLink>
             <NavLink to="/record" className={link}>{t('calibration')}</NavLink>
             {atLeast(me.role, 'analyst') && <NavLink to="/queue" className={link}>{t('queue')} {status && status.pending_verification > 0 && <span className="tag ms-1">{status.pending_verification}</span>}</NavLink>}
