@@ -50,7 +50,11 @@ def _parse_json(raw: str, provider: str) -> ExtractionResult | None:
         return None
 
 
-def extract(text: str, published: date, language: str, source_name: str) -> ExtractionResult:
+# official wires and government feeds speak for their government when a story names no other actor
+SOURCE_DEFAULT_ACTOR = {"qna": "QA", "spa": "SA", "wam": "AE", "adm": "AE", "ukgov": "UK", "kuna": "KW", "bna": "BH", "ona": "OM", "tasnim": "IR", "irna": "IR"}
+
+
+def extract(text: str, published: date, language: str, source_name: str, source_code: str | None = None) -> ExtractionResult:
     s = get_settings()
     out: ExtractionResult | None = None
     if s.model_provider == "anthropic":
@@ -58,13 +62,13 @@ def extract(text: str, published: date, language: str, source_name: str) -> Extr
     elif s.model_provider == "local":
         out = _provider_local(text, published, language, source_name)
     if out is None:
-        out = rules.extract(text, published, language)
+        out = rules.extract(text, published, language, default_actor=SOURCE_DEFAULT_ACTOR.get(source_code or ""))
     return out
 
 
 def process_document(db: Session, doc: Document) -> tuple[int, int]:
     published = (doc.published_at or doc.fetched_at).date()
-    res = extract(doc.raw_text or "", published, doc.language, doc.source.name)
+    res = extract(doc.raw_text or "", published, doc.language, doc.source.name, doc.source.code)
     actors = {a.code: a.id for a in db.scalars(select(Actor)).all()}
     issues = {i.code: i.id for i in db.scalars(select(Issue)).all()}
     n_e = n_o = 0

@@ -43,7 +43,7 @@ DEFAULT_URLS = {
     "ukmto_advisories": [],  # extra PDF URLs beyond the MSCIO listing
     "jwc_circulars": [],
     "jmic_dashboards": [],
-    "rss": ["qna", "qna_ar"],
+    "rss": ["qna", "qna_ar", "ukgov"],
     "allow_sanctioned_feeds": False,
 }
 

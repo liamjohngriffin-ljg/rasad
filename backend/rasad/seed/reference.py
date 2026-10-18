@@ -57,6 +57,8 @@ SOURCES = [
     ("state_fms", "State Department arms sales notifications", 3, "procurement", "https://www.state.gov/arms-sales-congressional-notifications/", "en", "Public", True),
     ("gdelt", "GDELT 2.0", 2, "wire", "https://www.gdeltproject.org/", "multi", "Free incl. commercial with attribution", True),
     ("qna", "Qatar News Agency", 2, "wire", "https://qna.org.qa/", "ar", "All rights reserved; RSS", False),
+    ("ukgov", "UK government news (FCDO, MOD, No.10)", 1, "official", "https://www.gov.uk/search/news-and-communications", "en", "Open Government Licence v3", True),
+    ("mscio", "MSCIO document library (EUNAVFOR Atalanta weekly reports, advisories)", 2, "advisory", "https://mscio.eu/advisories/", "en", "Releasable to shipping industry; no reuse statement", True),
     ("wam", "Emirates News Agency (WAM)", 2, "wire", "https://wam.ae/", "ar", "Reuse terms unverified", False),
     ("spa", "Saudi Press Agency", 2, "wire", "https://www.spa.gov.sa/", "ar", "Reuse terms unverified", False),
     ("adm", "Abu Dhabi Media Office RSS", 2, "rss", "https://www.mediaoffice.abudhabi/", "en", "RSS feeds published", True),

@@ -102,7 +102,7 @@ def _first(lexicon: dict[str, list[str]], text: str) -> str | None:
     return None
 
 
-def extract(text: str, published: date, language: str = "en") -> ExtractionResult:
+def extract(text: str, published: date, language: str = "en", default_actor: str | None = None) -> ExtractionResult:
     text_norm = " ".join(text.split())
     events: list[ExtractedEvent] = []
     for etype, sev, patterns in EVENT_LEXICON:
@@ -113,7 +113,7 @@ def extract(text: str, published: date, language: str = "en") -> ExtractionResul
             break
     observations: list[ExtractedObservation] = []
     speaker = next((lvl for lvl, pats in SPEAKER_LEXICON if _any(pats, text_norm)), "official_media")
-    actor = _first(ACTOR_LEXICON, text_norm) or _first({k: v for k, v in COUNTRY_LEXICON.items() if k not in ("HORMUZ", "RED_SEA")}, text_norm)
+    actor = _first(ACTOR_LEXICON, text_norm) or _first({k: v for k, v in COUNTRY_LEXICON.items() if k not in ("HORMUZ", "RED_SEA")}, text_norm) or default_actor
     if actor:
         for issue, rules in STANCE_LEXICON.items():
             hits = [(s, p) for p, s in rules if re.search(p, text_norm, re.I)]

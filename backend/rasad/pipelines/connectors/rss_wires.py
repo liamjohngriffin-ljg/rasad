@@ -22,6 +22,11 @@ from .base import RawDoc, check_egress, fetch_bytes, upsert_document
 FEEDS = {
     "qna": (["https://qna.org.qa/en/Pages/RSS-Feeds/Qatar", "https://qna.org.qa/en/Pages/RSS-Feeds/General", "https://qna.org.qa/en/Pages/RSS-Feeds/Analysis-and-Reports"], "en"),
     "qna_ar": (["https://qna.org.qa/ar-qa/Pages/RSS-Feeds/Qatar", "https://qna.org.qa/ar-qa/Pages/RSS-Feeds/General"], "ar"),
+    "ukgov": ([
+        "https://www.gov.uk/search/news-and-communications.atom?organisations%5B%5D=foreign-commonwealth-development-office",
+        "https://www.gov.uk/search/news-and-communications.atom?organisations%5B%5D=ministry-of-defence",
+        "https://www.gov.uk/search/news-and-communications.atom?organisations%5B%5D=prime-ministers-office-10-downing-street",
+    ], "en"),
     "adm": (["https://www.mediaoffice.abudhabi/en/rss/"], "en"),
     "wam": (["https://wam.ae/en/rss"], "en"),
     "spa": (["https://www.spa.gov.sa/rss"], "ar"),
