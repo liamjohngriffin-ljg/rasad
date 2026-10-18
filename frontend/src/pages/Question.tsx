@@ -1,8 +1,45 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { api, type IndicatorDetail, type QuestionDetail } from '../api'
+import { api, type IndicatorDetail, type PanelView, type QuestionDetail } from '../api'
+import { atLeast, useAuth } from '../auth'
 import { Delta, DemoTag, Prob, Sparkline, StateTag } from '../components'
 import { pct, useLang } from '../i18n'
+
+function PanelBlock({ code, open }: { code: string; open: boolean }) {
+  const { t } = useLang()
+  const { me } = useAuth()
+  const [pv, setPv] = useState<PanelView | null>(null)
+  const [p, setP] = useState(50)
+  const [why, setWhy] = useState('')
+  const [msg, setMsg] = useState<string | null>(null)
+  const load = () => api.panel(code).then((v) => { setPv(v); if (v.mine) { setP(Math.round(v.mine.probability * 100)); setWhy(v.mine.rationale ?? '') } })
+  useEffect(() => { load() }, [code]) // eslint-disable-line react-hooks/exhaustive-deps
+  const canForecast = open && atLeast(me?.role, 'analyst')
+  return (
+    <div className="card p-5">
+      <h2 className="font-medium mb-1">{t('panel')}</h2>
+      <div className="muted text-xs mb-3">{t('panelHint')}</div>
+      {canForecast && (
+        <form className="grid gap-2 mb-4" onSubmit={async (e) => { e.preventDefault(); try { await api.submitPanel(code, p / 100, why); setMsg(t('saved')); load() } catch (ex) { setMsg(String(ex)) } }}>
+          <div className="flex items-center gap-3">
+            <span className="muted text-xs">{t('yourEstimate')}</span>
+            <input type="range" min={1} max={99} value={p} onChange={(e) => setP(Number(e.target.value))} className="flex-1" />
+            <input type="number" min={1} max={99} value={p} onChange={(e) => setP(Number(e.target.value))} className="w-16 bg-transparent border border-[var(--line)] rounded px-2 py-1 mono text-sm" />
+            <span className="mono text-sm">%</span>
+          </div>
+          <textarea className="w-full bg-transparent border border-[var(--line)] rounded-md px-3 py-2 text-sm" rows={2} placeholder={t('rationale')} value={why} onChange={(e) => setWhy(e.target.value)} />
+          <div className="flex items-center gap-3"><button className="btn primary text-sm" type="submit">{t('submitEstimate')}</button>{msg && <span className="muted text-xs">{msg}</span>}</div>
+        </form>
+      )}
+      {pv && pv.latest.length > 0 && (
+        <table className="grid text-sm">
+          <thead><tr><th>{t('panelLatest')}</th><th>{t('asOf')}</th><th>{t('probability')}</th><th>{t('rationale')}</th></tr></thead>
+          <tbody>{pv.latest.map((r) => <tr key={r.code}><td>{r.forecaster}</td><td className="mono text-xs">{r.as_of}</td><td className="mono">{pct(r.probability)}</td><td className="muted text-xs">{r.rationale}</td></tr>)}</tbody>
+        </table>
+      )}
+    </div>
+  )
+}
 
 function EvidenceBlock({ ind }: { ind: IndicatorDetail }) {
   const { lang } = useLang()
@@ -94,6 +131,8 @@ export default function Question() {
           </div>
         </div>
       </div>
+
+      <PanelBlock code={q.code} open={q.status === 'open'} />
 
       <div className="grid md:grid-cols-2 gap-4">
         <div className="card p-5"><h2 className="font-medium mb-2">{t('decisions')}</h2><ul className="list-disc ps-5 text-sm">{q.decision_hooks.map((h) => <li key={h}>{h}</li>)}</ul></div>

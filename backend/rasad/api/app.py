@@ -34,13 +34,14 @@ from ..models import (
     ThreatEvent,
 )
 from ..policy import book as policy_book
-from . import auth_routes
+from . import auth_routes, workflow_routes
 from .deps import client_ip, current_user, require_role
 
 app = FastAPI(title="Rasad API", version=__version__)
 _dev_origins = [o.strip() for o in os.getenv("RASAD_CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=_dev_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.include_router(auth_routes.router)
+app.include_router(workflow_routes.router)
 PUBLIC_RECORD = os.getenv("RASAD_PUBLIC_RECORD", "false").lower() in ("1", "true", "yes")
 
 
@@ -363,7 +364,8 @@ def create_tasking(req: TaskingIn, db: Session = Depends(get_session), user: Use
 @app.get("/api/tasking")
 def list_tasking(db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
     return [
-        {"id": t.id, "text": t.text, "requested_by": t.requested_by, "status": t.status, "created_at": t.created_at.isoformat(), "answer_md": t.answer_md}
+        {"id": t.id, "text": t.text, "requested_by": t.requested_by, "status": t.status, "created_at": t.created_at.isoformat(), "answer_md": t.answer_md,
+         "answered_at": t.answered_at.isoformat() if t.answered_at else None, "question": db.get(Question, t.question_id).code if t.question_id else None}
         for t in db.scalars(select(TaskingRequest).order_by(TaskingRequest.created_at.desc())).all()
     ]
 

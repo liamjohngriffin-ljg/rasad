@@ -25,6 +25,9 @@ export default function App() {
             <NavLink to="/positions" className={link}>{t('positions')}</NavLink>
             <NavLink to="/record" className={link}>{t('calibration')}</NavLink>
             {atLeast(me.role, 'analyst') && <NavLink to="/queue" className={link}>{t('queue')} {status && status.pending_verification > 0 && <span className="tag ms-1">{status.pending_verification}</span>}</NavLink>}
+            {atLeast(me.role, 'analyst') && <NavLink to="/questions" className={link}>{t('questions')}</NavLink>}
+            {atLeast(me.role, 'analyst') && <NavLink to="/evidence" className={link}>{t('evidenceEntry')}</NavLink>}
+            <NavLink to="/tasking" className={link}>{t('taskingNav')}</NavLink>
             <NavLink to="/sources" className={link}>{t('sources')}</NavLink>
             {me.role === 'admin' && <NavLink to="/users" className={link}>{t('users')}</NavLink>}
           </nav>

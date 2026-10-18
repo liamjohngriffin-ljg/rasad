@@ -54,3 +54,44 @@ def test_commit_is_idempotent(client):
     a = client.post("/api/forecasts/commit", json={"as_of": "2026-10-18"}).json()
     b = client.post("/api/forecasts/commit", json={"as_of": "2026-10-18"}).json()
     assert a == b
+
+
+def test_workflow_question_indicator_panel_resolution(client):
+    vocab = client.get("/api/reference/vocab").json()
+    assert "event_count" in vocab["rule_types"] and "hormuz_transits" in vocab["series"]
+    r = client.post("/api/questions", json={
+        "code": "test_q_90", "title_en": "Will a test question resolve yes within 90 days?", "horizon_days": 90,
+        "resolution_criteria": "Resolves yes if the test passes.", "decision_hooks": ["none"], "base_rate": 0.2,
+        "indicators": [{"code": "attacks", "name_en": "Maritime attacks in the Gulf", "lr_present": 3.0, "lr_absent": 0.6,
+                        "rule": {"type": "event_count", "event_types": ["maritime_attack"], "countries": ["HORMUZ", "OM", "AE"], "window_days": 30, "threshold": 1}}],
+    })
+    assert r.status_code == 201, r.text
+    q = r.json()
+    assert q["status"] == "open" and len(q["indicators"]) == 1
+    bad = client.post("/api/questions/test_q_90/indicators", json={"code": "bad", "name_en": "Bad rule here", "lr_present": 2, "lr_absent": 0.5, "rule": {"type": "nope"}})
+    assert bad.status_code == 400
+    pv = client.post("/api/indicators/preview", json={"rule": {"type": "series_threshold", "series": "hormuz_transits", "op": "<=", "value": 20, "lookback_days": 30}, "as_of": "2026-10-11"}).json()
+    assert pv["state"] in ("present", "absent") and len(pv["history"]) == 6
+    ind_id = q["indicators"][0]["id"]
+    assert client.put(f"/api/indicators/{ind_id}", json={"lr_present": 4.0}).json()["lr_present"] == 4.0
+    assert client.put("/api/questions/test_q_90", json={"base_rate": 0.25}).json()["base_rate"] == 0.25
+    p = client.post("/api/questions/test_q_90/panel", json={"probability": 0.4, "rationale": "test", "as_of": "2026-10-18"})
+    assert p.status_code == 201
+    panel = client.get("/api/questions/test_q_90/panel").json()
+    assert panel["mine"]["probability"] == 0.4 and panel["latest"]
+    c = client.post("/api/forecasts/commit", json={"as_of": "2026-10-18"}).json()
+    assert any(x["question"] == "test_q_90" for x in c["committed"])
+    e = client.post("/api/events", json={"event_date": "2026-10-17", "event_type": "maritime_attack", "description_en": "Analyst-entered test attack on a tanker.", "country": "OM", "severity": 4, "source": "analyst test", "grade": "B2"})
+    assert e.status_code == 201 and e.json()["verification"] == "verified"
+    o = client.post("/api/observations", json={"actor": "IR", "issue": "hormuz_posture", "observed_at": "2026-10-17", "track": "stated", "score": 0.5, "text_excerpt": "Test statement about the strait.", "source": "analyst test"})
+    assert o.status_code == 201
+    sp = client.post("/api/series", json={"series": "war_risk_premium_hormuz_pct", "date": "2026-10-18", "value": 7.25, "unit": "pct_hull", "source": "broker quote"})
+    assert sp.status_code == 201
+    t = client.post("/api/tasking", json={"text": "How likely is a test?"}).json()
+    assert client.post(f"/api/tasking/{t['id']}/frame", json={"question_code": "test_q_90"}).json()["status"] == "framed"
+    assert client.post(f"/api/tasking/{t['id']}/answer", json={"answer_md": "## Answer\nAbout 40 percent."}).json()["status"] == "answered"
+    res = client.post("/api/questions/test_q_90/resolve", json={"outcome": True, "notes": "test resolved", "resolved_at": "2026-10-18"})
+    assert res.status_code == 200 and res.json()["status"] == "resolved"
+    assert client.put("/api/questions/test_q_90", json={"base_rate": 0.3}).status_code == 409
+    cal = client.get("/api/calibration").json()
+    assert any(x["code"] == "test_q_90" for x in cal["resolved"])

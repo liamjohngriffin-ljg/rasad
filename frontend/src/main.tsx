@@ -13,6 +13,9 @@ import Sources from './pages/Sources'
 import BriefPage from './pages/BriefPage'
 import Users from './pages/Users'
 import Account from './pages/Account'
+import Questions from './pages/Questions'
+import Evidence from './pages/Evidence'
+import Tasking from './pages/Tasking'
 import { AuthProvider } from './auth'
 
 const router = createBrowserRouter([
@@ -29,6 +32,9 @@ const router = createBrowserRouter([
       { path: 'sources', element: <Sources /> },
       { path: 'users', element: <Users /> },
       { path: 'account', element: <Account /> },
+      { path: 'questions', element: <Questions /> },
+      { path: 'evidence', element: <Evidence /> },
+      { path: 'tasking', element: <Tasking /> },
     ],
   },
 ])

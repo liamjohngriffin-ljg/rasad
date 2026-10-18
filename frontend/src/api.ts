@@ -44,11 +44,33 @@ async function get<T>(path: string): Promise<T> {
   if (!r.ok) throw new Error(`${r.status} ${path}`)
   return r.json() as Promise<T>
 }
-async function post<T>(path: string, body: unknown): Promise<T> {
-  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  if (!r.ok) throw new Error(`${r.status} ${path}`)
+async function send<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const r = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+  if (!r.ok) {
+    let detail = `${r.status}`
+    try { const j = await r.json(); detail = typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail) } catch { /* no body */ }
+    throw new Error(detail)
+  }
   return r.json() as Promise<T>
 }
+const post = <T,>(path: string, body: unknown) => send<T>('POST', path, body)
+const put = <T,>(path: string, body: unknown) => send<T>('PUT', path, body)
+const del = <T,>(path: string) => send<T>('DELETE', path)
+
+export type IndicatorDef = { id?: number; code: string; name_en: string; name_ar: string | null; description: string | null; lr_present: number; lr_absent: number; polarity: string; rule: Record<string, unknown> }
+export type QuestionDef = {
+  code: string; title_en: string; title_ar: string | null; horizon_days: number; resolution_criteria: string; decision_hooks: string[]; base_rate: number
+  base_rate_note: string | null; status: string; opened_at: string; resolves_at: string; order: number; indicators: IndicatorDef[]
+}
+export type Vocab = {
+  rule_types: string[]; event_types: string[]; cost_classes: string[]; speaker_levels: string[]; channels: string[]; ops: string[]; series: string[]
+  actors: { code: string; name_en: string; name_ar: string | null }[]; issues: { code: string; name_en: string; name_ar: string | null }[]; countries: string[]
+}
+export type PanelView = {
+  question: string; latest: { forecaster: string; code: string; as_of: string; probability: number; rationale: string | null; skill_weight: number }[]
+  mine: { as_of: string; probability: number; rationale: string | null } | null; history: { forecaster: string; as_of: string; probability: number }[]
+}
+export type TaskingRow = { id: number; text: string; requested_by: string | null; status: string; created_at: string; answer_md: string | null; answered_at: string | null; question: string | null }
 
 export const api = {
   status: () => get<Status>('/api/status'),
@@ -64,8 +86,25 @@ export const api = {
   queue: () => get<{ events: EventRow[]; observations: Observation[] }>('/api/verification/queue'),
   verify: (kind: 'event' | 'observation', id: number, decision: 'verified' | 'rejected', by: string, score?: number) => post(`/api/verification/${kind}/${id}`, { decision, by, score }),
   sources: () => get<{ code: string; name: string; tier: number; kind: string; url: string | null; language: string; licence_note: string | null; reuse_ok: boolean }[]>('/api/sources'),
-  tasking: () => get<{ id: number; text: string; requested_by: string | null; status: string; created_at: string }[]>('/api/tasking'),
+  tasking: () => get<TaskingRow[]>('/api/tasking'),
   createTasking: (text: string, requested_by: string) => post('/api/tasking', { text, requested_by }),
+  frameTasking: (id: number, question_code: string) => post(`/api/tasking/${id}/frame`, { question_code }),
+  answerTasking: (id: number, answer_md: string) => post(`/api/tasking/${id}/answer`, { answer_md }),
+  vocab: () => get<Vocab>('/api/reference/vocab'),
+  questions: () => get<QuestionDef[]>('/api/questions'),
+  questionDef: (code: string) => get<QuestionDef>(`/api/questions/${code}/definition`),
+  createQuestion: (q: Omit<QuestionDef, 'status' | 'opened_at' | 'resolves_at' | 'order'> & { opened_at?: string }) => post<QuestionDef>('/api/questions', q),
+  updateQuestion: (code: string, patch: Partial<QuestionDef>) => put<QuestionDef>(`/api/questions/${code}`, patch),
+  resolveQuestion: (code: string, outcome: boolean, notes: string, resolved_at?: string) => post(`/api/questions/${code}/resolve`, { outcome, notes, resolved_at }),
+  addIndicator: (code: string, ind: IndicatorDef) => post<IndicatorDef>(`/api/questions/${code}/indicators`, ind),
+  updateIndicator: (id: number, patch: Partial<IndicatorDef>) => put<IndicatorDef>(`/api/indicators/${id}`, patch),
+  deleteIndicator: (id: number) => del(`/api/indicators/${id}`),
+  previewRule: (rule: Record<string, unknown>, as_of?: string) => post<{ as_of: string; state: string; evidence: Record<string, unknown>; history: { as_of: string; state: string }[] }>('/api/indicators/preview', { rule, as_of }),
+  panel: (code: string) => get<PanelView>(`/api/questions/${code}/panel`),
+  submitPanel: (code: string, probability: number, rationale: string) => post(`/api/questions/${code}/panel`, { probability, rationale }),
+  createEvent: (e: Record<string, unknown>) => post<{ id: number }>('/api/events', e),
+  createObservation: (o: Record<string, unknown>) => post<{ id: number }>('/api/observations', o),
+  addSeriesPoint: (p: { series: string; date: string; value: number; unit: string; source: string }) => post('/api/series', p),
 }
 
 export type CalibrationData = {
