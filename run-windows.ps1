@@ -27,7 +27,9 @@ if (-not (Test-Path "rasad.db")) {
 $env:RASAD_STATIC_DIR = (Resolve-Path ".\static").Path
 $env:RASAD_DATA_DIR = (Resolve-Path ".").Path + "\data"
 New-Item -ItemType Directory -Force -Path $env:RASAD_DATA_DIR | Out-Null
-if ((Test-Path "..\licence.json") -and -not (Test-Path "$env:RASAD_DATA_DIR\licence.json")) { Copy-Item "..\licence.json" "$env:RASAD_DATA_DIR\licence.json" }
+foreach ($lic in @("$PSScriptRoot\licence.json", "$PSScriptRoot\..\licence.json")) {
+  if ((Test-Path $lic) -and -not (Test-Path "$env:RASAD_DATA_DIR\licence.json")) { Copy-Item $lic "$env:RASAD_DATA_DIR\licence.json"; Write-Host "== Licence installed from $lic" -ForegroundColor Cyan }
+}
 if (-not (Test-Path "data\.backfilled")) {
   Write-Host "== First run: fetching live data (PortWatch, UKMTO, JMIC, UK sanctions, QNA); needs internet, takes a few minutes" -ForegroundColor Cyan
   & $exe @args0 -m rasad.pipelines.run backfill
@@ -36,4 +38,11 @@ if (-not (Test-Path "data\.backfilled")) {
 if (-not $env:RASAD_ADMIN_PASSWORD) { $env:RASAD_ADMIN_PASSWORD = "change-me-on-first-login" }
 Write-Host "== Starting Rasad on http://localhost:8000 (sign in as admin / $env:RASAD_ADMIN_PASSWORD; close this window to stop)" -ForegroundColor Cyan
 Start-Job -ScriptBlock { Start-Sleep -Seconds 4; Start-Process "http://localhost:8000" } | Out-Null
+# the scheduler polls the feeds every few hours and commits the day's forecasts at 06:00 while this window is open
+$env:RASAD_POLL_INTERVAL_HOURS = "4"
+Start-Job -ArgumentList $exe, $args0, (Get-Location).Path, $env:RASAD_DATA_DIR -ScriptBlock {
+  param($exe, $a, $dir, $data)
+  Set-Location $dir; $env:RASAD_DATA_DIR = $data; $env:RASAD_MODEL_PROVIDER = "rules"; $env:RASAD_POLL_INTERVAL_HOURS = "4"
+  & $exe @a -m rasad.pipelines.scheduler
+} | Out-Null
 & $exe @args0 -m uvicorn rasad.api.app:app --port 8000
