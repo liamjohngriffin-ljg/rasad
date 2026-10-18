@@ -1,0 +1,67 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: rasad
+      POSTGRES_PASSWORD: ${RASAD_DB_PASSWORD:-rasad}
+      POSTGRES_DB: rasad
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rasad"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: .
+    environment:
+      RASAD_DATABASE_URL: postgresql+psycopg://rasad:${RASAD_DB_PASSWORD:-rasad}@db:5432/rasad
+      RASAD_MODEL_PROVIDER: ${RASAD_MODEL_PROVIDER:-rules}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      RASAD_LOCAL_MODEL_BASE_URL: ${RASAD_LOCAL_MODEL_BASE_URL:-}
+      RASAD_LOCAL_MODEL_NAME: ${RASAD_LOCAL_MODEL_NAME:-jais-2-70b-chat}
+      RASAD_DATA_DIR: /data
+    volumes:
+      - rasad_data:/data
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # One-shot: seed reference data, ledgers and a 30-day forecast history.
+  seed:
+    build: .
+    profiles: ["seed"]
+    environment:
+      RASAD_DATABASE_URL: postgresql+psycopg://rasad:${RASAD_DB_PASSWORD:-rasad}@db:5432/rasad
+      RASAD_DATA_DIR: /data
+    volumes:
+      - rasad_data:/data
+    command: ["python", "-m", "rasad.seed.load"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Daily pipeline: poll sources, extract, commit forecasts. Run from cron on the host:
+  #   docker compose run --rm pipeline
+  pipeline:
+    build: .
+    profiles: ["pipeline"]
+    environment:
+      RASAD_DATABASE_URL: postgresql+psycopg://rasad:${RASAD_DB_PASSWORD:-rasad}@db:5432/rasad
+      RASAD_MODEL_PROVIDER: ${RASAD_MODEL_PROVIDER:-rules}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      RASAD_LOCAL_MODEL_BASE_URL: ${RASAD_LOCAL_MODEL_BASE_URL:-}
+      RASAD_DATA_DIR: /data
+    volumes:
+      - rasad_data:/data
+    command: ["python", "-m", "rasad.pipelines.run", "daily"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  rasad_data:
