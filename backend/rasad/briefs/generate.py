@@ -162,7 +162,9 @@ def render_template(db: Session, question: Question, as_of: date, lang: str = "e
 
 def _model_polish(markdown: str, lang: str) -> tuple[str, str] | None:
     settings = get_settings()
-    if settings.model_provider == "anthropic" and settings.anthropic_api_key:
+    from .. import licence
+
+    if settings.model_provider == "anthropic" and settings.anthropic_api_key and licence.current().has("model"):
         try:
             import anthropic
 

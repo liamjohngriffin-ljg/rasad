@@ -103,6 +103,10 @@ def push_new(db: Session) -> dict:
     url = _setting(db, "webhook_url")
     if not url:
         return {"pushed": 0, "reason": "no webhook configured"}
+    from .. import licence
+
+    if not licence.current().has("api"):
+        return {"pushed": 0, "reason": "the licence does not include the api module"}
     kind = _setting(db, "webhook_kind") or "teams"
     try:
         min_sev = int(_setting(db, "webhook_min_severity") or "2")

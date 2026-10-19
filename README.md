@@ -51,7 +51,19 @@ Analysts work from the Today page (alerts, moves, new events), the verification 
 
 ## Licensing
 
-The platform runs in evaluation mode (full functionality, three seats) until a licence file is installed under Administration. Licence files are JSON documents signed with the vendor's Ed25519 key (`python -m rasad.licence issue vendor.key --licensee "Org" --seats 25 --expires 2027-12-31 --features core,arabic,api,model,export`); the public key is embedded in `backend/rasad/licence.py` and the private key never enters the repository. Expired licences get a 30-day grace period. API keys (`Authorization: Bearer rsk_...`) are created under Administration and act with the role they were given.
+The platform runs in evaluation mode (three seats; core, Arabic and export modules) until a licence file is installed under Administration. Licence files are JSON documents signed with the vendor's Ed25519 key (`python -m rasad.licence issue vendor.key --licensee "Org" --seats 25 --expires 2027-12-31 --features core,arabic,api,model,export`); the public key is embedded in `backend/rasad/licence.py` and the private key never enters the repository. Expired licences get a 30-day grace period.
+
+Modules carried by the `features` list and enforced by the server:
+
+| Module | What it switches on |
+| --- | --- |
+| core | Board, questions and indicators, evidence entry, verification queue, briefs and Word export, alerts, position book, record (always required) |
+| arabic | Arabic interface, Arabic briefs and the Arabic guide |
+| export | Bulk CSV and JSON exports of events, observations, series and the forecast log |
+| api | API keys (bearer tokens for BI tools, a SIEM or scripts) and alerts to a Teams or Slack channel |
+| model | Model-assisted extraction and brief polish (Claude API or a local model); without it the built-in rules run |
+
+Removing a module from a renewed licence disables it at once: existing API keys stop authenticating and the channel stops posting. API keys (`Authorization: Bearer rsk_...`) are created under Administration and act with the role they were given.
 
 ## Run it for real (a server you keep)
 

@@ -22,7 +22,7 @@ from ..auth.models import ROLES, ApiKey, Setting, User
 from ..config import get_settings
 from ..db import get_session
 from ..models import Forecast, PolicyObservation, SeriesPoint, ThreatEvent
-from .deps import current_user, require_role
+from .deps import require_feature, current_user, require_role
 
 router = APIRouter(prefix="/api", tags=["admin"])
 
@@ -100,12 +100,10 @@ def list_keys(db: Session = Depends(get_session), admin: User = Depends(require_
     return [_key_row(k) for k in db.scalars(select(ApiKey).order_by(ApiKey.created_at.desc()))]
 
 
-@router.post("/keys", status_code=201)
+@router.post("/keys", status_code=201, dependencies=[Depends(require_feature("api"))])
 def create_key(req: ApiKeyIn, db: Session = Depends(get_session), admin: User = Depends(require_role("admin"))) -> dict:
     if req.role not in ROLES:
         raise HTTPException(400, "unknown role")
-    if not licence.current().has("api") and licence.current().mode == "licensed":
-        raise HTTPException(403, "the licence does not include API access")
     token = "rsk_" + secrets.token_urlsafe(32)
     k = ApiKey(name=req.name, prefix=token[:12], key_hash=hashlib.sha256(token.encode()).hexdigest(), role=req.role, created_by=admin.username)
     db.add(k)
@@ -163,8 +161,11 @@ def write_settings(req: SettingsIn, db: Session = Depends(get_session), admin: U
         if k in SECRET_SETTINGS and v.startswith(MASK):
             continue  # the masked value came back unchanged from the form
         if k == "webhook_url" and v:
+            from .. import licence
             from ..engine import notify
 
+            if not licence.current().has("api"):
+                raise HTTPException(403, "not in your licence: api (API keys and the team channel)")
             try:
                 notify.check_url(v)
             except ValueError as exc:
@@ -180,7 +181,7 @@ def write_settings(req: SettingsIn, db: Session = Depends(get_session), admin: U
     return _public_settings(db, admin)
 
 
-@router.post("/settings/webhook/test")
+@router.post("/settings/webhook/test", dependencies=[Depends(require_feature("api"))])
 def test_webhook(db: Session = Depends(get_session), admin: User = Depends(require_role("admin"))) -> dict:
     from ..engine import notify
 
@@ -207,7 +208,7 @@ def _csv(rows: list[dict], filename: str) -> StreamingResponse:
     return StreamingResponse(io.BytesIO(data), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
-@router.get("/export/events.csv")
+@router.get("/export/events.csv", dependencies=[Depends(require_feature("export"))])
 def export_events(days: int = 365, verified_only: bool = False, db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))):
     since = date.today() - timedelta(days=days)
     stmt = select(ThreatEvent).where(ThreatEvent.event_date >= since).order_by(ThreatEvent.event_date)
@@ -218,7 +219,7 @@ def export_events(days: int = 365, verified_only: bool = False, db: Session = De
     return _csv(rows, f"rasad-events-{date.today().isoformat()}.csv")
 
 
-@router.get("/export/observations.csv")
+@router.get("/export/observations.csv", dependencies=[Depends(require_feature("export"))])
 def export_observations(days: int = 365, db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))):
     since = date.today() - timedelta(days=days)
     rows = [{"id": o.id, "observed_at": o.observed_at.isoformat(), "actor": o.actor.code, "issue": o.issue.code, "track": o.track, "channel": o.channel, "cost_class": o.cost_class, "speaker_level": o.speaker_level, "language": o.language, "score": o.score, "source_grade": o.source_grade, "model_confidence": o.model_confidence, "text_excerpt": o.text_excerpt, "text_excerpt_en": o.text_excerpt_en, "source": (o.provenance or {}).get("source"), "url": (o.provenance or {}).get("url"), "verification": o.verification, "is_synthetic": o.is_synthetic} for o in db.scalars(select(PolicyObservation).where(PolicyObservation.observed_at >= since).order_by(PolicyObservation.observed_at))]
@@ -226,7 +227,7 @@ def export_observations(days: int = 365, db: Session = Depends(get_session), use
     return _csv(rows, f"rasad-observations-{date.today().isoformat()}.csv")
 
 
-@router.get("/export/series.csv")
+@router.get("/export/series.csv", dependencies=[Depends(require_feature("export"))])
 def export_series(name: str = Query(min_length=2), days: int = 1000, db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))):
     since = date.today() - timedelta(days=days)
     rows = [{"series": p.series, "date": p.date.isoformat(), "value": p.value, "unit": p.unit, "source": p.source, "is_synthetic": p.is_synthetic} for p in db.scalars(select(SeriesPoint).where(SeriesPoint.series == name, SeriesPoint.date >= since).order_by(SeriesPoint.date))]
@@ -234,14 +235,14 @@ def export_series(name: str = Query(min_length=2), days: int = 1000, db: Session
     return _csv(rows, f"rasad-{name}-{date.today().isoformat()}.csv")
 
 
-@router.get("/export/forecasts.csv")
+@router.get("/export/forecasts.csv", dependencies=[Depends(require_feature("export"))])
 def export_forecasts(db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))):
     rows = [{"id": f.id, "question": f.question.code, "as_of": f.as_of.isoformat(), "machine_prob": f.machine_prob, "panel_prob": f.panel_prob, "final_prob": f.final_prob, "prev_hash": f.prev_hash, "commit_hash": f.commit_hash} for f in db.scalars(select(Forecast).order_by(Forecast.id))]
     auth.audit(db, user, "export", "forecasts.csv", {"rows": len(rows)})
     return _csv(rows, f"rasad-forecasts-{date.today().isoformat()}.csv")
 
 
-@router.get("/export/forecasts.json")
+@router.get("/export/forecasts.json", dependencies=[Depends(require_feature("export"))])
 def export_forecasts_json(db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))) -> list[dict]:
     """The full commitment log with decompositions, for independent verification of the chain."""
     return [{"id": f.id, "question": f.question.code, "as_of": f.as_of.isoformat(), "final_prob": f.final_prob, "decomposition": f.decomposition, "prev_hash": f.prev_hash, "commit_hash": f.commit_hash} for f in db.scalars(select(Forecast).order_by(Forecast.id))]

@@ -168,3 +168,32 @@ def test_two_factor_enrolment_login_recovery_and_policy(admin_client, anon_clien
         db.commit()
         db.close()
     assert plain.get("/api/board").status_code == 200
+
+
+def test_licence_modules_are_enforced(admin_client, monkeypatch):
+    from rasad import licence
+
+    full = licence.current()
+    limited = licence.LicenceState("licensed", licensee="Tier one", seats=50, features=["core", "arabic"])
+    monkeypatch.setattr(licence, "_cached", limited)
+    try:
+        r = admin_client.get("/api/export/events.csv")
+        assert r.status_code == 403 and "export" in r.json()["detail"]
+        assert admin_client.post("/api/keys", json={"name": "bi", "role": "viewer"}).status_code == 403
+        assert admin_client.post("/api/settings/webhook/test").status_code == 403
+        assert admin_client.get("/api/board").status_code == 200  # core stays on
+    finally:
+        monkeypatch.setattr(licence, "_cached", full)
+    # with the module back, a key works; take the module away and the same key stops working
+    key = admin_client.post("/api/keys", json={"name": "bi2", "role": "viewer"}).json()["token"]
+    from fastapi.testclient import TestClient
+
+    from rasad.api.app import app
+
+    bearer = TestClient(app, headers={"Authorization": f"Bearer {key}"})
+    assert bearer.get("/api/board").status_code == 200
+    monkeypatch.setattr(licence, "_cached", limited)
+    try:
+        assert bearer.get("/api/board").status_code == 401
+    finally:
+        monkeypatch.setattr(licence, "_cached", full)

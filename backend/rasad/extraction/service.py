@@ -57,7 +57,12 @@ SOURCE_DEFAULT_ACTOR = {"qna": "QA", "spa": "SA", "wam": "AE", "adm": "AE", "ukg
 def extract(text: str, published: date, language: str, source_name: str, source_code: str | None = None) -> ExtractionResult:
     s = get_settings()
     out: ExtractionResult | None = None
-    if s.model_provider == "anthropic":
+    from .. import licence
+
+    licensed = licence.current().has("model")
+    if s.model_provider in ("anthropic", "local") and not licensed:
+        out = None  # the licence does not carry model-assisted extraction: the built-in rules run
+    elif s.model_provider == "anthropic":
         out = _provider_anthropic(text, published, language, source_name)
     elif s.model_provider == "local":
         out = _provider_local(text, published, language, source_name)

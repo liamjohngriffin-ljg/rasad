@@ -6,8 +6,16 @@ import { useLang } from '../i18n'
 const input = 'w-full bg-transparent border border-[var(--line)] rounded-md px-3 py-2 text-sm'
 const label = 'muted text-xs block mb-1'
 
+const MODULES: [string, string, string][] = [
+  ['core', 'Core: board, questions, evidence, verification, briefs, alerts', 'الأساس: اللوحة والأسئلة والأدلة والتحقق والموجزات والتنبيهات'],
+  ['arabic', 'Arabic interface and briefs', 'الواجهة والموجزات بالعربية'],
+  ['export', 'Bulk exports (CSV, JSON)', 'التصدير المجمّع (CSV وJSON)'],
+  ['api', 'API keys and team channel', 'مفاتيح الواجهة البرمجية وقناة الفريق'],
+  ['model', 'Model-assisted extraction', 'الاستخلاص بمساعدة النموذج'],
+]
+
 function LicenceCard() {
-  const { t } = useLang()
+  const { t, lang } = useLang()
   const [lic, setLic] = useState<Licence | null>(null)
   const [text, setText] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
@@ -22,6 +30,7 @@ function LicenceCard() {
           <div><div className={label}>{t('seats')}</div><span className="mono">{lic.seats_used ?? '?'} / {lic.seats}</span></div>
           <div><div className={label}>{t('expires')}</div><span className="mono">{lic.expires ?? '-'}</span></div>
           <div><div className={label}>{t('features')}</div>{lic.features.join(', ')}</div>
+          <div className="md:col-span-5 flex flex-wrap gap-2 text-xs">{MODULES.map(([code, en, ar]) => <span key={code} className={`tag ${lic.features.includes(code) ? 'present' : 'unknown'}`} title={lic.features.includes(code) ? '' : t('notLicensed')}>{lic.features.includes(code) ? '✓' : '×'} {lang === 'ar' ? ar : en}</span>)}</div>
           {lic.reason && <div className="md:col-span-5 muted text-xs">{lic.reason}</div>}
         </div>
       )}
