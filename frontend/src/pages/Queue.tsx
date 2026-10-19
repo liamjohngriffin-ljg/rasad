@@ -5,8 +5,8 @@ import { useLang } from '../i18n'
 
 export default function Queue() {
   const { t, lang } = useLang()
-  const [q, setQ] = useState<{ events: EventRow[]; observations: Observation[] } | null>(null)
-  const [by, setBy] = useState(() => localStorage.getItem('rasad.analyst') || 'analyst')
+  const [q, setQ] = useState<{ events: EventRow[]; observations: Observation[]; pending_reports?: number } | null>(null)
+  const by = ''
   const [filter, setFilter] = useState<'all' | 'connectors' | 'extractions'>('connectors')
   const [source, setSource] = useState<string>('')
   const load = () => api.queue().then(setQ)
@@ -20,21 +20,32 @@ export default function Queue() {
   return (
     <div className="grid gap-4">
       <div className="flex items-center gap-2 text-sm flex-wrap">
-        <span className="muted">analyst</span><input className="bg-transparent border border-[var(--line)] rounded px-2 py-1" value={by} onChange={(e) => { setBy(e.target.value); localStorage.setItem('rasad.analyst', e.target.value) }} />
-        <span className="ms-4 flex gap-1">{(['connectors', 'extractions', 'all'] as const).map((f) => <button key={f} className={`btn text-xs ${filter === f ? 'primary' : ''}`} onClick={() => setFilter(f)}>{t(f === 'all' ? 'filterAll' : f)}</button>)}</span>
+        <span className="flex gap-1">{(['connectors', 'extractions', 'all'] as const).map((f) => <button key={f} className={`btn text-xs ${filter === f ? 'primary' : ''}`} onClick={() => setFilter(f)}>{t(f === 'all' ? 'filterAll' : f)}</button>)}</span>
         <select className="bg-transparent border border-[var(--line)] rounded px-2 py-1 text-xs" value={source} onChange={(e) => setSource(e.target.value)}><option value="">{t('source')}</option>{sources.map((s) => <option key={s} value={s}>{s}</option>)}</select>
         <span className="ms-auto flex gap-1"><button className="btn text-xs" onClick={() => bulk('verified')}>{t('acceptShown')} ({shown.length})</button><button className="btn text-xs" onClick={() => bulk('rejected')}>{t('rejectShown')}</button></span>
       </div>
       <div className="card p-4">
-        <h2 className="font-medium mb-2">{t('pendingEvents')} <span className="muted text-sm">{shown.length} / {q.events.length}</span></h2>
+        <h2 className="font-medium mb-2">{t('pendingEvents')} <span className="muted text-sm">{shown.length} / {q.events.length} {t('incidents')}{q.pending_reports !== undefined && q.pending_reports !== q.events.length && <> · {q.pending_reports} {t('reports')}</>}</span></h2>
         {shown.length === 0 && <div className="muted text-sm">{t('queueEmpty')}</div>}
         <div className="space-y-3">
           {shown.slice(0, 200).map((e) => (
             <div key={e.id} className="border-b border-[var(--line)] pb-3 text-sm">
-              <div><span className="mono muted me-2">{e.event_date}</span><span className="tag me-2">{e.event_type}</span>{e.country && <span className="tag me-2">{e.country}</span>}<span className="tag me-2">{String(e.provenance?.grade ?? '')}</span><span className="tag me-2">{'!'.repeat(e.severity)}</span><DemoTag show={e.is_synthetic} /></div>
+              <div><span className="mono muted me-2">{e.event_date}</span><span className="tag me-2">{e.event_type}</span>{e.country && <span className="tag me-2">{e.country}</span>}{e.publisher && <span className="tag me-2">{e.publisher}</span>}<span className="tag me-2">{String(e.provenance?.grade ?? '')}</span><span className="tag me-2">{'!'.repeat(e.severity)}</span><DemoTag show={e.is_synthetic} /></div>
               <div className="mt-1">{lang === 'ar' && e.description_ar ? e.description_ar : e.description_en}</div>
               <div className="muted text-xs mt-1">{e.provenance?.source} {e.provenance?.url && <a className="accent" href={e.provenance.url} target="_blank" rel="noreferrer">link</a>} {e.provenance?.quote && <span>· “{e.provenance.quote}”</span>}</div>
-              <div className="mt-2 flex gap-2"><button className="btn text-xs" onClick={() => decide('event', e.id, 'verified')}>{t('accept')}</button><button className="btn text-xs" onClick={() => decide('event', e.id, 'rejected')}>{t('reject')}</button></div>
+              {e.other_reports && e.other_reports.length > 0 && (
+                <div className="mt-2 ms-3 ps-3 border-s-2 border-[var(--accent)]/40 grid gap-1">
+                  <div className="text-xs accent">{t('alsoReported')} · {e.incident_link === 'anchored' ? t('linkAnchored') : e.incident_link === 'manual' ? t('linkManual') : t('linkProbable')}</div>
+                  {e.other_reports.map((o) => (
+                    <div key={o.id} className="text-xs flex gap-2 items-baseline">
+                      <span className="tag">{o.publisher}</span><span className="mono muted">{o.event_date}</span><span className="muted flex-1">{o.description_en.slice(0, 220)}</span>
+                      <span className="muted">{o.verification}</span>
+                      <button className="btn text-xs" title={t('detachHint')} onClick={async () => { await api.setIncident(o.id, null); load() }}>{t('detach')}</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-2 flex gap-2"><button className="btn text-xs" onClick={() => decide('event', e.id, 'verified')}>{t('accept')}{e.other_reports?.length ? ` (${e.other_reports.length + 1})` : ''}</button><button className="btn text-xs" onClick={() => decide('event', e.id, 'rejected')}>{t('reject')}</button></div>
             </div>
           ))}
         </div>

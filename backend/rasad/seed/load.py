@@ -171,6 +171,9 @@ def seed(as_of: date | None = None, history_days: int = 30) -> None:
         load_reference(db)
         load_questions(db, as_of - timedelta(days=history_days))
         load_ledgers(db, as_of)
+        from ..engine import incidents
+
+        incidents.link(db, since=date(2024, 1, 1), until=as_of + timedelta(days=1))
         commit_history(db, as_of, history_days)
     finally:
         db.close()

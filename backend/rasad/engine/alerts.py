@@ -76,7 +76,12 @@ def after_poll(db: Session, since: datetime | None = None) -> int:
         src = (e.provenance or {}).get("source", "")
         if e.verification != "verified" and str((e.provenance or {}).get("grade", "C"))[:1].upper() not in ("A", "B"):
             continue  # an unverified lexicon extraction is not news until an analyst accepts it
-        if _raise(db, kind="severe_event", severity=3 if e.severity >= 5 else 2, key=f"event:{e.id}", title_en=f"{e.event_date.isoformat()} {e.event_type} {e.country or ''}: {e.description_en[:140]}",
+        # one alert per incident: the key is the incident's first report, which never changes as
+        # further publishers' reports join (ids only grow)
+        first = e.id
+        if e.incident_id:
+            first = db.scalar(select(func.min(ThreatEvent.id)).where(ThreatEvent.incident_id == e.incident_id)) or e.id
+        if _raise(db, kind="severe_event", severity=3 if e.severity >= 5 else 2, key=f"event:{first}", title_en=f"{e.event_date.isoformat()} {e.event_type} {e.country or ''}: {e.description_en[:140]}",
                   title_ar=e.description_ar[:160] if e.description_ar else None, detail={"event_id": e.id, "source": src, "verification": e.verification}):
             n += 1
     today = date.today()

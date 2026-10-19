@@ -126,6 +126,10 @@ class ThreatEvent(Base):
     description_ar: Mapped[str | None] = mapped_column(Text)
     source_doc_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id"))
     provenance: Mapped[dict] = mapped_column(JSON, default=dict)  # {"source": ..., "url": ..., "grade": "B2"}
+    # cross-source incident linking: every report of one real-world incident carries the id of the
+    # canonical report (its own id for the canonical one); link is anchored | probable | manual | detached
+    incident_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    incident_link: Mapped[str | None] = mapped_column(String(16))
     verification: Mapped[str] = mapped_column(String(16), default="pending")  # pending, verified, rejected
     verified_by: Mapped[str | None] = mapped_column(String(80))
     verified_at: Mapped[datetime | None] = mapped_column(DateTime)

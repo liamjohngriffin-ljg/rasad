@@ -9,6 +9,7 @@ export type EventRow = {
   id: number; event_date: string; event_type: string; location_name: string | null; country: string | null; actor: string | null; lat?: number | null; lon?: number | null
   target: string | null; fatalities: number | null; severity: number; description_en: string; description_ar: string | null
   provenance: Record<string, string>; verification: string; is_synthetic: boolean
+  incident_id?: number | null; incident_link?: string | null; publisher?: string; other_reports?: EventRow[]
 }
 export type IndicatorDetail = {
   code: string; name_en: string; name_ar: string | null; description: string | null; polarity: string | null; lr_present: number | null
@@ -97,6 +98,7 @@ export const api = {
   calibration: () => get<CalibrationData>('/api/calibration'),
   brief: (code: string, lang: 'en' | 'ar', asOf?: string) => get<{ content_md: string; generator: string; generated_at: string }>(`/api/briefs/${code}?lang=${lang}${asOf ? `&as_of=${asOf}` : ''}`),
   queue: () => get<{ events: EventRow[]; observations: Observation[] }>('/api/verification/queue'),
+  setIncident: (id: number, to: number | null) => post<EventRow>(`/api/events/${id}/incident`, { to }),
   verify: (kind: 'event' | 'observation', id: number, decision: 'verified' | 'rejected', by: string, score?: number) => post(`/api/verification/${kind}/${id}`, { decision, by, score }),
   sources: () => get<{ code: string; name: string; tier: number; kind: string; url: string | null; language: string; licence_note: string | null; reuse_ok: boolean; documents: number; last_fetched: string | null; last_published: string | null }[]>('/api/sources'),
   seriesIndex: () => get<{ series: string; points: number; first: string; last: string; synthetic: number; unit: string | null; latest_value: number | null; latest_source: string | null; days_stale: number }[]>('/api/series'),

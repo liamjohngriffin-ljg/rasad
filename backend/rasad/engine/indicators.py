@@ -67,11 +67,14 @@ def _event_count(db: Session, rule: dict, as_of: date) -> EvaluatedState:
             rows.append(r)
         else:
             excluded += 1
+    # several publishers' reports of one incident count once (see engine/incidents.py)
+    incidents = {r.incident_id or r.id for r in rows}
     threshold = int(rule.get("threshold", 1))
     return EvaluatedState(
-        "present" if len(rows) >= threshold else "absent",
+        "present" if len(incidents) >= threshold else "absent",
         {
-            "count": len(rows),
+            "count": len(incidents),
+            "reports": len(rows),
             "threshold": threshold,
             "window_days": window,
             "event_ids": [r.id for r in rows][:25],

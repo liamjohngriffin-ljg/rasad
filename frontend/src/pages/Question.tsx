@@ -68,7 +68,7 @@ function EvidenceBlock({ ind }: { ind: IndicatorDetail }) {
   if (ev.score !== undefined && ev.actor) rows.push(`${ev.actor} / ${ev.issue} (${ev.track ?? ''}): ${ev.score} from ${ev.n} observations`)
   if (ev.divergence !== undefined) rows.push(`${ev.actor} / ${ev.issue}: divergence ${ev.divergence} (threshold ${ev.threshold})`)
   if (ev.recent_count !== undefined && ev.expected_in_window !== undefined) rows.push(`${ev.actor} / ${ev.issue}: ${ev.recent_count} statements vs ${ev.expected_in_window} expected`)
-  if (ev.count !== undefined) rows.push(`${ev.count} / ${ev.threshold} in ${ev.window_days} days`)
+  if (ev.count !== undefined) rows.push(`${ev.count} / ${ev.threshold} incidents in ${ev.window_days} days${ev.reports !== undefined && ev.reports !== ev.count ? ` (${ev.reports} reports across publishers)` : ''}`)
   if (ev.reason) rows.push(String(ev.reason))
   return (
     <div className="mt-2 text-sm">

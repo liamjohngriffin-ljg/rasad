@@ -16,6 +16,7 @@ from ..auth.models import User
 from ..briefs import generate as briefs
 from ..db import get_session, init_db, session_factory
 from ..engine import alerts as alert_engine
+from ..engine import incidents
 from ..engine import run as engine_run
 from ..engine import scoring
 from ..engine.commitment import verify_chain
@@ -85,7 +86,7 @@ def status(db: Session = Depends(get_session), user: User = Depends(current_user
         "series_points": db.scalar(select(func.count(SeriesPoint.id))),
         "forecasts": db.scalar(select(func.count(Forecast.id))),
         "open_questions": db.scalar(select(func.count(Question.id)).where(Question.status == "open")),
-        "pending_verification": (db.scalar(select(func.count(ThreatEvent.id)).where(ThreatEvent.verification == "pending")) or 0)
+        "pending_verification": len({(i or -j) for i, j in db.execute(select(ThreatEvent.incident_id, ThreatEvent.id).where(ThreatEvent.verification == "pending"))})
         + (db.scalar(select(func.count(PolicyObservation.id)).where(PolicyObservation.verification == "pending")) or 0),
         "synthetic_rows": synthetic,
         "last_commit": last.isoformat() if last else None,
@@ -212,6 +213,9 @@ def _event_row(e: ThreatEvent) -> dict:
         "provenance": e.provenance,
         "verification": e.verification,
         "is_synthetic": e.is_synthetic,
+        "incident_id": e.incident_id,
+        "incident_link": e.incident_link,
+        "publisher": incidents.publisher(e),
     }
 
 
@@ -413,10 +417,21 @@ def list_tasking(db: Session = Depends(get_session), user: User = Depends(curren
 
 @app.get("/api/verification/queue")
 def verification_queue(db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))) -> dict:
-    evs = db.scalars(select(ThreatEvent).where(ThreatEvent.verification == "pending").order_by(ThreatEvent.event_date.desc())).all()
+    evs = db.scalars(select(ThreatEvent).where(ThreatEvent.verification == "pending").order_by(ThreatEvent.event_date.desc(), ThreatEvent.id)).all()
     obs = db.scalars(select(PolicyObservation).where(PolicyObservation.verification == "pending").order_by(PolicyObservation.observed_at.desc())).all()
+    # one queue item per incident: the first pending report carries the other publishers' reports
+    groups: dict[int, list[ThreatEvent]] = {}
+    for e in evs:
+        groups.setdefault(e.incident_id or -e.id, []).append(e)
+    items = []
+    for key, rows in groups.items():
+        head = _event_row(rows[0])
+        others = [m for m in incidents.members(db, rows[0]) if m.id != rows[0].id] if rows[0].incident_id else []
+        head["other_reports"] = [_event_row(m) for m in others]
+        items.append(head)
     return {
-        "events": [_event_row(e) for e in evs],
+        "events": items,
+        "pending_reports": len(evs),
         "observations": [
             {"id": o.id, "actor": o.actor.code, "issue": o.issue.code, "observed_at": o.observed_at.isoformat(), "track": o.track, "channel": o.channel, "cost_class": o.cost_class, "speaker_level": o.speaker_level, "language": o.language, "score": o.score, "source_grade": o.source_grade, "model_confidence": o.model_confidence, "text_excerpt": o.text_excerpt, "text_excerpt_en": o.text_excerpt_en, "provenance": o.provenance, "is_synthetic": o.is_synthetic}
             for o in obs
@@ -426,7 +441,8 @@ def verification_queue(db: Session = Depends(get_session), user: User = Depends(
 
 class Decision(BaseModel):
     decision: str  # verified | rejected
-    by: str
+    by: str = ""
+    whole_incident: bool = True
     score: float | None = None  # analysts may correct a stance score when verifying an observation
 
 
@@ -444,7 +460,12 @@ def verify_bulk(req: BulkDecision, db: Session = Depends(get_session), user: Use
     if model is None:
         raise HTTPException(400, "kind must be event or observation")
     n = 0
-    for row in db.scalars(select(model).where(model.id.in_(req.ids[:500]), model.verification == "pending")):
+    ids = set(req.ids[:500])
+    if model is ThreatEvent:
+        inc = {i for (i,) in db.execute(select(ThreatEvent.incident_id).where(ThreatEvent.id.in_(ids), ThreatEvent.incident_id.is_not(None)))}
+        if inc:
+            ids |= {i for (i,) in db.execute(select(ThreatEvent.id).where(ThreatEvent.incident_id.in_(inc)))}
+    for row in db.scalars(select(model).where(model.id.in_(ids), model.verification == "pending")):
         row.verification, row.verified_by, row.verified_at = req.decision, user.username, datetime.utcnow()
         n += 1
     db.commit()
@@ -462,14 +483,51 @@ def verify(kind: str, item_id: int, req: Decision, db: Session = Depends(get_ses
     row = db.get(model, item_id)
     if row is None:
         raise HTTPException(404, "not found")
-    row.verification = req.decision
-    row.verified_by = user.username
-    row.verified_at = datetime.utcnow()
+    rows = [row]
+    if kind == "event" and req.whole_incident and row.incident_id:
+        # one decision for every publisher's report of the incident; rejected reports stay rejected
+        rows = [m for m in incidents.members(db, row) if m.id == row.id or m.verification == "pending"]
+    for r in rows:
+        r.verification = req.decision
+        r.verified_by = user.username
+        r.verified_at = datetime.utcnow()
     if kind == "observation" and req.score is not None:
         row.score = max(-1.0, min(1.0, req.score))
     db.commit()
-    auth.audit(db, user, f"{kind}_{req.decision}", str(item_id), {"score": req.score} if req.score is not None else {})
-    return {"id": item_id, "kind": kind, "verification": row.verification}
+    if kind == "event" and req.decision == "rejected" and row.incident_id:
+        incidents.link(db, since=row.event_date - timedelta(days=2), until=row.event_date + timedelta(days=2))
+    auth.audit(db, user, f"{kind}_{req.decision}", str(item_id), {**({"score": req.score} if req.score is not None else {}), **({"incident_reports": [r.id for r in rows]} if len(rows) > 1 else {})})
+    return {"id": item_id, "kind": kind, "verification": row.verification, "applied_to": [r.id for r in rows]}
+
+
+class LinkIn(BaseModel):
+    to: int | None = None  # None detaches the report from its incident
+
+
+@app.post("/api/events/{event_id}/incident")
+def set_incident(event_id: int, req: LinkIn, db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))) -> dict:
+    """Analyst override of the automatic linking: detach a report (never relinked automatically), or
+    link it by hand to another report's incident."""
+    e = db.get(ThreatEvent, event_id)
+    if e is None:
+        raise HTTPException(404, "not found")
+    before = e.incident_id
+    if req.to is None:
+        e.incident_id, e.incident_link = None, "detached"
+        db.commit()
+        # the remaining reports regroup without it
+        incidents.link(db, since=e.event_date - timedelta(days=2), until=e.event_date + timedelta(days=2))
+    else:
+        other = db.get(ThreatEvent, req.to)
+        if other is None or other.id == e.id:
+            raise HTTPException(400, "no such report to link to")
+        target = other.incident_id or other.id
+        if other.incident_id is None:
+            other.incident_id, other.incident_link = other.id, "manual"
+        e.incident_id, e.incident_link = target, "manual"
+        db.commit()
+    auth.audit(db, user, "incident_link_changed", str(event_id), {"from": before, "to": e.incident_id})
+    return _event_row(e)
 
 
 # Serve the built front end when present (docker image copies it to /app/static). The app is a

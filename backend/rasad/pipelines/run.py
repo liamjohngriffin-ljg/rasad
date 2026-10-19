@@ -6,6 +6,7 @@
   python -m rasad.pipelines.run daily       all three, in order, then the alert digest
   python -m rasad.pipelines.run digest      email unacknowledged alerts (RASAD_SMTP_HOST, RASAD_DIGEST_TO)
   python -m rasad.pipelines.run backup [keep]   SQLite online backup into <data dir>/backups (default keeps 30)
+  python -m rasad.pipelines.run link        relink reports of one incident across publishers (whole record)
   python -m rasad.pipelines.run backfill    first run: PortWatch since 2024, every MSCIO folder, the sanctions lists
   python -m rasad.pipelines.run ingest-dir <path> [folder]   ingest a directory of PDFs (air-gapped hosts)
   python -m rasad.pipelines.run snapshot [path]              export real ledger rows to the seed snapshot
@@ -25,6 +26,7 @@ import yaml
 from ..config import get_settings
 from ..db import init_db, session_factory
 from ..engine import alerts as alert_engine
+from ..engine import incidents
 from ..engine import run as engine_run
 from ..extraction import service as extraction
 from .connectors import gdelt, jmic, jwc, mscio, portwatch, rss_wires, sanctions, state_fms, uk_sanctions, ukmto
@@ -94,6 +96,7 @@ def poll(*, backfill: bool = False) -> dict:
             _try(report, f"jmic:{url.rsplit('/', 1)[-1]}", lambda u=url: jmic.fetch_and_ingest(db, u)["week"])
         for code in cfg.get("rss") or []:
             _try(report, f"rss_{code}", lambda c=code: rss_wires.fetch_and_ingest(db, c, allow_sanctioned=bool(cfg.get("allow_sanctioned_feeds"))))
+        _try(report, "incidents", lambda: incidents.link(db))
         _try(report, "alerts", lambda: alert_engine.after_poll(db))
     finally:
         db.close()
@@ -150,6 +153,15 @@ def backup(keep: int = 30) -> dict:
     return {"backup": dest, "size_mb": round(os.path.getsize(dest) / (1024 * 1024), 1), "kept": min(len(olds), keep), "removed": removed, "free_mb": free}
 
 
+def link_incidents() -> dict:
+    """Relink reports of the same incident across publishers over the whole record."""
+    db = session_factory()()
+    try:
+        return incidents.link(db, since=date(2024, 1, 1))
+    finally:
+        db.close()
+
+
 def digest() -> dict:
     db = session_factory()()
     try:
@@ -183,6 +195,9 @@ def main(argv: list[str]) -> None:
         print(poll())
     elif cmd == "backfill":
         print(poll(backfill=True))
+        print(link_incidents())
+    elif cmd == "link":
+        print(link_incidents())
     elif cmd == "extract":
         print(extract())
     elif cmd == "commit":
