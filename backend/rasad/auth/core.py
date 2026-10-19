@@ -202,7 +202,8 @@ def bootstrap_admin(db: Session) -> str | None:
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)  # never readable by others, not even briefly
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(pw + "\n")
-    create_user(db, os.getenv("RASAD_ADMIN_USERNAME", "admin"), pw, "admin", "Administrator", must_change=generated is not None)
+    # a generated password, or the launcher's well-known default, must be replaced at first sign-in
+    create_user(db, os.getenv("RASAD_ADMIN_USERNAME", "admin"), pw, "admin", "Administrator", must_change=generated is not None or pw == "change-me-on-first-login")
     return generated
 
 
