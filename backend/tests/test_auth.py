@@ -91,3 +91,80 @@ def test_licence_verify_and_evaluation_cap(tmp_path, monkeypatch):
     st = licence.load(str(p), today=date(2026, 3, 15))
     assert st.mode == "evaluation" and st.seats == licence.EVALUATION_SEATS
     assert licence.load(str(tmp_path / "missing.json")).mode == "evaluation"
+
+
+def test_totp_rfc6238_vector():
+    import base64
+
+    from rasad.auth import totp
+
+    secret = base64.b32encode(b"12345678901234567890").decode()
+    assert totp.code_at(secret, 59 // 30) == "287082"
+    step = totp.verify(secret, "287082", now=59)
+    assert step == 1
+    assert totp.verify(secret, "287082", now=59, last_step=step) is None  # no replay
+
+
+def test_two_factor_enrolment_login_recovery_and_policy(admin_client, anon_client):
+    import time as _t
+
+    from fastapi.testclient import TestClient
+
+    from rasad.api.app import app
+
+    def make_client(_):
+        return TestClient(app, headers={"X-Rasad-Client": "tests"})
+
+    from rasad.auth import totp
+
+    admin = admin_client
+    uname = f"mfa{int(_t.time() * 1000) % 100000}"
+    r = admin.post("/api/users", json={"username": uname, "password": "first-password-1", "role": "analyst"})
+    assert r.status_code == 200, r.text
+    uid = r.json()["id"]
+    c = make_client(None)
+    assert c.post("/api/auth/login", json={"username": uname, "password": "first-password-1"}).status_code == 200
+    setup = c.post("/api/auth/mfa/setup").json()
+    assert setup["uri"].startswith("otpauth://totp/") and setup["qr_svg"].startswith("<svg")
+    assert c.post("/api/auth/mfa/enable", json={"code": "000000" if totp.code_at(setup["secret"], totp.current_step()) != "000000" else "111111"}).status_code == 400
+    en = c.post("/api/auth/mfa/enable", json={"code": totp.code_at(setup["secret"], totp.current_step())})
+    assert en.status_code == 200, en.text
+    codes = en.json()["recovery_codes"]
+    assert len(codes) == 8 and c.get("/api/auth/me").json()["mfa_enabled"] is True
+
+    fresh = make_client(None)
+    r = fresh.post("/api/auth/login", json={"username": uname, "password": "first-password-1"})
+    assert r.status_code == 401 and r.json()["detail"] == "mfa_required"
+    assert fresh.post("/api/auth/login", json={"username": uname, "password": "first-password-1", "code": "123456x"}).status_code == 401
+    assert fresh.post("/api/auth/login", json={"username": uname, "password": "first-password-1", "code": codes[0]}).status_code == 200
+    again = make_client(None)
+    assert again.post("/api/auth/login", json={"username": uname, "password": "first-password-1", "code": codes[0]}).status_code == 401  # spent
+    assert fresh.get("/api/auth/me").json()["recovery_codes_left"] == 7
+
+    # sign out everywhere: the other session's cookie stops working, this one keeps going
+    assert fresh.post("/api/auth/sessions/revoke").status_code == 200
+    assert c.get("/api/board").status_code == 401
+    assert fresh.get("/api/board").status_code == 200
+
+    # admin reset for a lost phone
+    assert admin.patch(f"/api/users/{uid}", json={"reset_mfa": True}).status_code == 200
+    assert fresh.get("/api/board").status_code == 401
+    plain = make_client(None)
+    assert plain.post("/api/auth/login", json={"username": uname, "password": "first-password-1"}).status_code == 200
+
+    # organisation policy: without a second factor only the account endpoints answer
+    assert admin.put("/api/settings", json={"values": {"require_mfa": "true"}}).status_code == 200
+    try:
+        assert plain.get("/api/board").status_code == 403
+        assert plain.get("/api/auth/me").json()["must_enrol_mfa"] is True
+        assert plain.post("/api/auth/mfa/disable", json={"password": "first-password-1"}).status_code == 400
+    finally:
+        # the admin has no second factor either, so the policy is lifted directly
+        from rasad.auth.models import Setting
+        from rasad.db import session_factory
+
+        db = session_factory()()
+        db.merge(Setting(key="require_mfa", value={"v": "false"}))
+        db.commit()
+        db.close()
+    assert plain.get("/api/board").status_code == 200

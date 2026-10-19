@@ -29,6 +29,7 @@ router = APIRouter(prefix="/api", tags=["admin"])
 SETTING_KEYS = {
     "org_name": "", "product_name": "Rasad", "marking": os.getenv("RASAD_MARKING", "OFFICIAL"), "default_lang": "en", "accent": "#d9a441",
     "logo_data_url": "", "footer_note": "", "public_url": os.getenv("RASAD_PUBLIC_URL", ""), "digest_to": os.getenv("RASAD_DIGEST_TO", ""),
+    "require_mfa": os.getenv("RASAD_REQUIRE_MFA", "false"),
 }
 
 

@@ -47,6 +47,11 @@ const STR = {
     weeklyBrief: 'Weekly brief', seriesNote: 'Grey line: daily values; gold line: 7-day mean; hollow points are demo rows; vertical ticks are reported events of the selected types (hover for the description).', map: 'Map', showPending: 'show pending', mapNote: 'Filled markers carry a reported position; hollow markers sit near the centroid of their area. Dashed outlines are not yet verified. Land from Natural Earth (public domain).', mapHint: 'Select a marker to read the event.',
     freshness: 'Data freshness', lastFetched: 'last fetched', latest: 'latest', stale: 'days old', acceptShown: 'Accept all shown', rejectShown: 'Reject all shown', filterAll: 'all', connectors: 'connectors (grade A, B)', extractions: 'extractions (grade C)',
     integrationsHint: 'Use a key as a bearer token: Authorization: Bearer rsk_… on any API call. Viewer keys read; analyst keys may write evidence and acknowledge alerts.',
+    mfaTitle: 'Two-factor sign-in', mfaIntro: 'Add a code from an authenticator app (Microsoft Authenticator, Google Authenticator, 1Password) to every sign-in.', mfaStart: 'Set up', mfaScan: 'Scan the code with the app, then enter the six-digit code it shows.', mfaManual: 'Or type this key:', verify: 'Verify', back: 'Back', copy: 'Copy',
+    mfaOn: 'on', recoveryLeft: 'recovery codes left', newRecoveryCodes: 'New recovery codes', mfaTurnOff: 'Turn off', mfaPrompt: 'Enter the six-digit code from your authenticator app.', mfaRecoveryHint: 'No phone? Enter one of your recovery codes instead.', mfaInvalid: 'That code was not accepted.',
+    recoveryCodesHint: 'Recovery codes: each works once if the phone is lost. Store them offline; they are not shown again.', mfaRequiredHint: 'Your administrator requires two-factor sign-in. Set it up to continue.',
+    sessionsTitle: 'Sessions', sessionsHint: 'Sign out every other browser and device. Changing the password does this automatically.', signOutElsewhere: 'Sign out everywhere else', sessionsRevoked: 'Other sessions signed out.',
+    resetMfa: 'Reset 2FA', resetMfaConfirm: 'Remove two-factor sign-in for', requireMfa: 'Two-factor sign-in', requireMfaHint: 'required for every user',
   },
   ar: {
     app: 'رصد', board: 'اللوحة', positions: 'سجل المواقف', calibration: 'السجل', queue: 'التحقق', sources: 'المصادر',
@@ -92,6 +97,11 @@ const STR = {
     weeklyBrief: 'الموجز الأسبوعي', seriesNote: 'الخط الرمادي: القيم اليومية؛ الخط الذهبي: متوسط 7 أيام؛ النقاط الفارغة صفوف توضيحية؛ الخطوط الرأسية أحداث مُبلّغ عنها من الأنواع المختارة.', map: 'الخريطة', showPending: 'إظهار غير الموثق', mapNote: 'العلامات المملوءة لها موقع مُبلّغ عنه؛ الفارغة موضوعة قرب مركز منطقتها. الحدود المتقطعة لم تُوثَّق بعد. اليابسة من Natural Earth (ملك عام).', mapHint: 'اختر علامة لقراءة الحدث.',
     freshness: 'حداثة البيانات', lastFetched: 'آخر جلب', latest: 'الأحدث', stale: 'يوماً منذ آخر نقطة', acceptShown: 'قبول كل المعروض', rejectShown: 'رفض كل المعروض', filterAll: 'الكل', connectors: 'الموصلات (درجة A و B)', extractions: 'الاستخلاصات (درجة C)',
     integrationsHint: 'استخدم المفتاح كرمز حامل: Authorization: Bearer rsk_… في أي نداء. مفاتيح المشاهدة تقرأ؛ مفاتيح المحلل تكتب الأدلة وتؤكد التنبيهات.',
+    mfaTitle: 'التحقق بخطوتين', mfaIntro: 'أضف رمزاً من تطبيق مصادقة (Microsoft Authenticator أو Google Authenticator أو 1Password) إلى كل تسجيل دخول.', mfaStart: 'إعداد', mfaScan: 'امسح الرمز بالتطبيق ثم أدخل الرقم المكوّن من ستة أرقام.', mfaManual: 'أو اكتب هذا المفتاح:', verify: 'تحقق', back: 'رجوع', copy: 'نسخ',
+    mfaOn: 'مفعّل', recoveryLeft: 'رموز استرداد متبقية', newRecoveryCodes: 'رموز استرداد جديدة', mfaTurnOff: 'إيقاف', mfaPrompt: 'أدخل الرمز المكوّن من ستة أرقام من تطبيق المصادقة.', mfaRecoveryHint: 'لا يتوفر الهاتف؟ أدخل أحد رموز الاسترداد.', mfaInvalid: 'لم يُقبل الرمز.',
+    recoveryCodesHint: 'رموز الاسترداد: يصلح كل منها مرة واحدة عند فقدان الهاتف. احفظها خارج الشبكة؛ لن تُعرض مرة أخرى.', mfaRequiredHint: 'يشترط المسؤول التحقق بخطوتين. أكمل الإعداد للمتابعة.',
+    sessionsTitle: 'الجلسات', sessionsHint: 'تسجيل الخروج من كل المتصفحات والأجهزة الأخرى. يحدث ذلك تلقائياً عند تغيير كلمة المرور.', signOutElsewhere: 'تسجيل الخروج من الأجهزة الأخرى', sessionsRevoked: 'تم تسجيل الخروج من الجلسات الأخرى.',
+    resetMfa: 'إعادة ضبط التحقق', resetMfaConfirm: 'إزالة التحقق بخطوتين للمستخدم', requireMfa: 'التحقق بخطوتين', requireMfaHint: 'إلزامي لكل المستخدمين',
   },
 } as const
 

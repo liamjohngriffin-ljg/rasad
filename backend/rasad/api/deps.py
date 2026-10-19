@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..auth.core import parse_token
+from ..auth.core import parse_token_full
 from ..auth.models import ApiKey, User
 from ..db import get_session
 
@@ -36,15 +36,28 @@ def current_user(request: Request, db: Session = Depends(get_session)) -> User:
         if u is None:
             raise HTTPException(401, "invalid API key")
         return u
-    uid = parse_token(request.cookies.get(COOKIE))
-    if uid is None:
+    tok = parse_token_full(request.cookies.get(COOKIE))
+    if tok is None:
         raise HTTPException(401, "not signed in")
+    uid, sv = tok
     if request.method not in SAFE_METHODS and request.headers.get(CLIENT_HEADER) is None:
         raise HTTPException(403, "missing client header")
     user = db.get(User, uid)
-    if user is None or not user.active:
+    if user is None or not user.active or (user.session_version or 0) != sv:
         raise HTTPException(401, "not signed in")
+    if not user.totp_enabled and not request.url.path.startswith("/api/auth/") and _mfa_required(db):
+        raise HTTPException(403, "mfa_enrolment_required")
     return user
+
+
+def _mfa_required(db: Session) -> bool:
+    from ..auth.models import Setting
+
+    row = db.get(Setting, "require_mfa")
+    import os
+
+    v = str((row.value or {}).get("v", "")) if row is not None else os.getenv("RASAD_REQUIRE_MFA", "false")
+    return v.strip().lower() in ("1", "true", "yes", "on")
 
 
 def require_role(*roles: str):

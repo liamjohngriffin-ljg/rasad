@@ -15,7 +15,7 @@ export default function App() {
   const [logo, setLogo] = useState<string | null>(null)
   if (loading) return <div className="min-h-full flex items-center justify-center muted">…</div>
   if (!me) return <Login />
-  if (me.must_change_password && location.pathname !== '/account') return <Navigate to="/account" replace />
+  if ((me.must_change_password || me.must_enrol_mfa) && location.pathname !== '/account') return <Navigate to="/account" replace />
   const link = ({ isActive }: { isActive: boolean }) => `px-2.5 py-1.5 rounded-md text-sm whitespace-nowrap ${isActive ? 'bg-[var(--bg-2)] text-[var(--ink)]' : 'muted hover:text-[var(--ink)]'}`
   return (
     <div className="min-h-full flex flex-col">

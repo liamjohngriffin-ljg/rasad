@@ -26,6 +26,12 @@ class User(Base):
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # bumped on password change, admin reset and "sign out everywhere"; tokens carry the value
+    session_version: Mapped[int | None] = mapped_column(Integer, default=0)
+    totp_secret: Mapped[str | None] = mapped_column(String(64))
+    totp_enabled: Mapped[bool | None] = mapped_column(Boolean, default=False)
+    totp_last_step: Mapped[int | None] = mapped_column(Integer)
+    recovery_hashes: Mapped[list | None] = mapped_column(JSON)
 
 
 class AuditLog(Base):

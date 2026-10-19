@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 
-export type Me = { id: number; username: string; display_name: string; role: 'viewer' | 'analyst' | 'admin'; must_change_password: boolean }
+export type Me = { id: number; username: string; display_name: string; role: 'viewer' | 'analyst' | 'admin'; must_change_password: boolean; mfa_enabled: boolean; recovery_codes_left: number | null; must_enrol_mfa: boolean }
 
-type AuthCtx = { me: Me | null; loading: boolean; login: (u: string, p: string) => Promise<string | null>; logout: () => Promise<void>; refresh: () => Promise<void> }
+type AuthCtx = { me: Me | null; loading: boolean; login: (u: string, p: string, code?: string) => Promise<string | null>; logout: () => Promise<void>; refresh: () => Promise<void> }
 const Ctx = createContext<AuthCtx>({ me: null, loading: true, login: async () => null, logout: async () => {}, refresh: async () => {} })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -15,8 +15,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch { setMe(null) } finally { setLoading(false) }
   }, [])
   useEffect(() => { refresh() }, [refresh])
-  const login = async (username: string, password: string) => {
-    const r = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Rasad-Client': 'web' }, body: JSON.stringify({ username, password }) })
+  const login = async (username: string, password: string, code?: string) => {
+    const r = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Rasad-Client': 'web' }, body: JSON.stringify({ username, password, code: code || null }) })
     if (!r.ok) { try { return (await r.json()).detail as string } catch { return `${r.status}` } }
     setMe(await r.json())
     return null

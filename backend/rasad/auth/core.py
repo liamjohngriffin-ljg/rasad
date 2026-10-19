@@ -71,13 +71,19 @@ def _unb64(s: str) -> bytes:
     return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
 
 
-def make_token(user_id: int, ttl: int = SESSION_TTL_SECONDS) -> str:
-    payload = _b64(json.dumps({"uid": user_id, "exp": int(time.time()) + ttl, "n": secrets.token_hex(4)}).encode())
+def make_token(user_id: int, ttl: int = SESSION_TTL_SECONDS, session_version: int | None = 0) -> str:
+    payload = _b64(json.dumps({"uid": user_id, "sv": session_version or 0, "exp": int(time.time()) + ttl, "n": secrets.token_hex(4)}).encode())
     sig = _b64(hmac.new(secret_key(), payload.encode(), hashlib.sha256).digest())
     return f"{payload}.{sig}"
 
 
 def parse_token(token: str | None) -> int | None:
+    t = parse_token_full(token)
+    return t[0] if t else None
+
+
+def parse_token_full(token: str | None) -> tuple[int, int] | None:
+    """(user id, session version) from a valid, unexpired token."""
     if not token or "." not in token:
         return None
     payload, sig = token.rsplit(".", 1)
@@ -90,7 +96,35 @@ def parse_token(token: str | None) -> int | None:
         return None
     if data.get("exp", 0) < time.time():
         return None
-    return int(data["uid"])
+    return int(data["uid"]), int(data.get("sv", 0))
+
+
+def token_for(user: User) -> str:
+    return make_token(user.id, session_version=user.session_version or 0)
+
+
+def check_second_factor(db: Session, user: User, code: str | None) -> bool:
+    """True when the user has no second factor, or `code` is a fresh TOTP code or an unused
+    recovery code (which is then spent)."""
+    from . import totp
+
+    if not user.totp_enabled or not user.totp_secret:
+        return True
+    if not code:
+        return False
+    step = totp.verify(user.totp_secret, code, last_step=user.totp_last_step)
+    if step is not None:
+        user.totp_last_step = step
+        db.commit()
+        return True
+    h = totp.hash_recovery(code)
+    left = list(user.recovery_hashes or [])
+    if h in left:
+        left.remove(h)
+        user.recovery_hashes = left
+        db.commit()
+        return True
+    return False
 
 
 def create_user(db: Session, username: str, password: str, role: str = "viewer", display_name: str | None = None, *, must_change: bool = False) -> User:

@@ -21,12 +21,30 @@ def _user_row(u: User) -> dict:
         "id": u.id, "username": u.username, "display_name": u.display_name, "role": u.role, "active": u.active,
         "must_change_password": u.must_change_password, "created_at": u.created_at.isoformat(),
         "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
+        "mfa_enabled": bool(u.totp_enabled), "recovery_codes_left": len(u.recovery_hashes or []) if u.totp_enabled else None,
     }
+
+
+def _mfa_policy(db: Session) -> bool:
+    from .admin_routes import get_setting
+
+    return get_setting(db, "require_mfa").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _me_row(db: Session, u: User) -> dict:
+    row = _user_row(u)
+    row["must_enrol_mfa"] = u.id > 0 and _mfa_policy(db) and not u.totp_enabled
+    return row
+
+
+def _set_session(response: Response, request: Request, u: User) -> None:
+    response.set_cookie(COOKIE, auth.token_for(u), max_age=auth.SESSION_TTL_SECONDS, httponly=True, samesite="lax", secure=cookie_secure(request), path="/")
 
 
 class LoginIn(BaseModel):
     username: str
     password: str
+    code: str | None = None  # authenticator code or a recovery code, when the account has two-factor sign-in
 
 
 @router.post("/auth/login")
@@ -39,10 +57,17 @@ def login(req: LoginIn, request: Request, response: Response, db: Session = Depe
         throttle.hit(key)
         auth.audit(db, None, "login_failed", req.username.lower(), ip=client_ip(request))
         raise HTTPException(401, "wrong username or password")
+    if user.totp_enabled:
+        if not req.code:
+            raise HTTPException(401, "mfa_required")
+        if not auth.check_second_factor(db, user, req.code):
+            throttle.hit(key)
+            auth.audit(db, user, "login_failed_mfa", ip=client_ip(request))
+            raise HTTPException(401, "mfa_invalid")
     throttle.clear(key)
-    response.set_cookie(COOKIE, auth.make_token(user.id), max_age=auth.SESSION_TTL_SECONDS, httponly=True, samesite="lax", secure=cookie_secure(request), path="/")
-    auth.audit(db, user, "login", ip=client_ip(request))
-    return _user_row(user)
+    _set_session(response, request, user)
+    auth.audit(db, user, "login", None, {"mfa": bool(user.totp_enabled)}, ip=client_ip(request))
+    return _me_row(db, user)
 
 
 @router.post("/auth/logout")
@@ -53,8 +78,8 @@ def logout(request: Request, response: Response, db: Session = Depends(get_sessi
 
 
 @router.get("/auth/me")
-def me(user: User = Depends(current_user)) -> dict:
-    return _user_row(user)
+def me(db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+    return _me_row(db, user)
 
 
 class PasswordChange(BaseModel):
@@ -63,16 +88,106 @@ class PasswordChange(BaseModel):
 
 
 @router.post("/auth/password")
-def change_password(req: PasswordChange, request: Request, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+def change_password(req: PasswordChange, request: Request, response: Response, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
     if not auth.verify_password(req.current_password, user.password_hash):
         raise HTTPException(400, "current password is wrong")
     if len(req.new_password) < 10:
         raise HTTPException(400, "new password must be at least 10 characters")
     user.password_hash = auth.hash_password(req.new_password)
     user.must_change_password = False
+    user.session_version = (user.session_version or 0) + 1  # every other session ends
     db.commit()
+    _set_session(response, request, user)
     auth.audit(db, user, "password_changed", ip=client_ip(request))
     return {"ok": True}
+
+
+@router.post("/auth/sessions/revoke")
+def revoke_sessions(request: Request, response: Response, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+    """Sign out everywhere else: older cookies stop working, this browser gets a fresh one."""
+    if user.id <= 0:
+        raise HTTPException(400, "API keys have no sessions")
+    user.session_version = (user.session_version or 0) + 1
+    db.commit()
+    _set_session(response, request, user)
+    auth.audit(db, user, "sessions_revoked", ip=client_ip(request))
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Two-factor sign-in (TOTP)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/auth/mfa/setup")
+def mfa_setup(request: Request, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+    """Start enrolment: a new secret is stored (not yet active) and returned with a QR code."""
+    from ..auth import totp
+    from .admin_routes import get_setting
+
+    if user.id <= 0:
+        raise HTTPException(400, "API keys cannot enrol")
+    if user.totp_enabled:
+        raise HTTPException(400, "two-factor sign-in is already on; turn it off first to re-enrol")
+    user.totp_secret = totp.new_secret()
+    user.totp_last_step = None
+    db.commit()
+    issuer = get_setting(db, "product_name") or "Rasad"
+    uri = totp.uri(user.totp_secret, user.username, issuer)
+    auth.audit(db, user, "mfa_setup_started", ip=client_ip(request))
+    return {"secret": user.totp_secret, "uri": uri, "qr_svg": totp.qr_svg(uri)}
+
+
+class CodeIn(BaseModel):
+    code: str
+
+
+@router.post("/auth/mfa/enable")
+def mfa_enable(req: CodeIn, request: Request, response: Response, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+    from ..auth import totp
+
+    if user.id <= 0 or not user.totp_secret or user.totp_enabled:
+        raise HTTPException(400, "start enrolment first")
+    step = totp.verify(user.totp_secret, req.code)
+    if step is None:
+        raise HTTPException(400, "that code does not match; check the device clock and try the next code")
+    codes = totp.new_recovery_codes()
+    user.totp_enabled, user.totp_last_step = True, step
+    user.recovery_hashes = [totp.hash_recovery(c) for c in codes]
+    user.session_version = (user.session_version or 0) + 1
+    db.commit()
+    _set_session(response, request, user)
+    auth.audit(db, user, "mfa_enabled", ip=client_ip(request))
+    return {"ok": True, "recovery_codes": codes}
+
+
+class PasswordIn(BaseModel):
+    password: str
+
+
+@router.post("/auth/mfa/disable")
+def mfa_disable(req: PasswordIn, request: Request, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+    if user.id <= 0 or not auth.verify_password(req.password, user.password_hash):
+        raise HTTPException(400, "password is wrong")
+    if _mfa_policy(db):
+        raise HTTPException(400, "two-factor sign-in is required by your administrator")
+    user.totp_enabled, user.totp_secret, user.recovery_hashes, user.totp_last_step = False, None, None, None
+    db.commit()
+    auth.audit(db, user, "mfa_disabled", ip=client_ip(request))
+    return {"ok": True}
+
+
+@router.post("/auth/mfa/recovery")
+def mfa_new_recovery(req: PasswordIn, request: Request, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+    from ..auth import totp
+
+    if user.id <= 0 or not user.totp_enabled or not auth.verify_password(req.password, user.password_hash):
+        raise HTTPException(400, "password is wrong or two-factor sign-in is off")
+    codes = totp.new_recovery_codes()
+    user.recovery_hashes = [totp.hash_recovery(c) for c in codes]
+    db.commit()
+    auth.audit(db, user, "mfa_recovery_regenerated", ip=client_ip(request))
+    return {"recovery_codes": codes}
 
 
 # ---------------------------------------------------------------------------
@@ -117,6 +232,7 @@ class UserPatch(BaseModel):
     active: bool | None = None
     display_name: str | None = None
     password: str | None = None
+    reset_mfa: bool | None = None  # a lost phone: the user enrols again at next sign-in
 
 
 @router.patch("/users/{user_id}")
@@ -141,6 +257,13 @@ def patch_user(user_id: int, req: UserPatch, request: Request, db: Session = Dep
         if len(req.password) < 10:
             raise HTTPException(400, "password must be at least 10 characters")
         u.password_hash, u.must_change_password, changes["password"] = auth.hash_password(req.password), True, "reset"
+        u.session_version = (u.session_version or 0) + 1
+    if req.reset_mfa:
+        u.totp_enabled, u.totp_secret, u.recovery_hashes, u.totp_last_step = False, None, None, None
+        u.session_version = (u.session_version or 0) + 1
+        changes["mfa"] = "reset"
+    if req.active is False:
+        u.session_version = (u.session_version or 0) + 1
     db.commit()
     auth.audit(db, admin, "user_updated", u.username, changes, ip=client_ip(request))
     return _user_row(u)
