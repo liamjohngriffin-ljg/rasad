@@ -16,7 +16,7 @@ export default function Board() {
     <div>
       <div className="flex items-baseline justify-between mb-4">
         <h1 className="text-xl font-semibold">{t('board')}</h1>
-        <span className="muted text-sm">{t('asOf')} <span className="mono">{asOf}</span></span>
+        <span className="flex items-center gap-3"><Link className="btn text-xs" to="/weekly">{t('weeklyBrief')}</Link><span className="muted text-sm">{t('asOf')} <span className="mono">{asOf}</span></span></span>
       </div>
       <div className="grid gap-3">
         {qs.map((q) => (

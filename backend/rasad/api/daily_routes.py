@@ -260,6 +260,28 @@ def markdown_to_docx(md: str, *, lang: str, marking: str, title_fallback: str) -
     return buf.getvalue()
 
 
+@router.get("/briefs/weekly")
+def weekly_brief(lang: str = Query("en", pattern="^(en|ar)$"), as_of: str | None = None, days: int = 7, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+    from ..briefs import weekly
+
+    d = date.fromisoformat(as_of) if as_of else date.today()
+    b = weekly.generate(db, d, lang, days)
+    auth.audit(db, user, "weekly_brief_generated", d.isoformat(), {"lang": lang})
+    return {"id": b.id, "lang": b.lang, "generator": b.generator, "generated_at": b.generated_at.isoformat(), "content_md": b.content_md}
+
+
+@router.get("/briefs/weekly/docx")
+def weekly_brief_docx(lang: str = Query("en", pattern="^(en|ar)$"), as_of: str | None = None, days: int = 7, db: Session = Depends(get_session), user: User = Depends(current_user)):
+    from ..briefs import weekly
+
+    d = date.fromisoformat(as_of) if as_of else date.today()
+    md = weekly.render(db, d, lang, days)
+    marking = os.getenv("RASAD_MARKING", "OFFICIAL")
+    data = markdown_to_docx(md, lang=lang, marking=marking, title_fallback="Weekly situation brief")
+    auth.audit(db, user, "weekly_brief_exported", d.isoformat(), {"lang": lang})
+    return StreamingResponse(io.BytesIO(data), media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": f'attachment; filename="rasad-weekly-{d.isoformat()}-{lang}.docx"'})
+
+
 @router.get("/briefs/{code}/docx")
 def brief_docx(code: str, lang: str = Query("en", pattern="^(en|ar)$"), as_of: str | None = None, polish: bool = True, db: Session = Depends(get_session), user: User = Depends(current_user)):
     d = date.fromisoformat(as_of) if as_of else date.today()

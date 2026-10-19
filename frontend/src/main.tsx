@@ -20,6 +20,7 @@ import Today from './pages/Today'
 import Search from './pages/Search'
 import Admin from './pages/Admin'
 import MapPage from './pages/MapPage'
+import WeeklyBrief from './pages/WeeklyBrief'
 import { AuthProvider } from './auth'
 
 const router = createBrowserRouter([
@@ -43,6 +44,7 @@ const router = createBrowserRouter([
       { path: 'search', element: <Search /> },
       { path: 'admin', element: <Admin /> },
       { path: 'map', element: <MapPage /> },
+      { path: 'weekly', element: <WeeklyBrief /> },
     ],
   },
 ])

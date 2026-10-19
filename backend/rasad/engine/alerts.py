@@ -74,6 +74,8 @@ def after_poll(db: Session, since: datetime | None = None) -> int:
     recent = date.today() - timedelta(days=14)  # a backfill of old reports must not read as news
     for e in db.scalars(select(ThreatEvent).where(ThreatEvent.severity >= 4, ThreatEvent.is_synthetic.is_(False), ThreatEvent.created_at >= since, ThreatEvent.event_date >= recent, ThreatEvent.verification != "rejected").order_by(ThreatEvent.id)):
         src = (e.provenance or {}).get("source", "")
+        if e.verification != "verified" and str((e.provenance or {}).get("grade", "C"))[:1].upper() not in ("A", "B"):
+            continue  # an unverified lexicon extraction is not news until an analyst accepts it
         if _raise(db, kind="severe_event", severity=3 if e.severity >= 5 else 2, key=f"event:{e.id}", title_en=f"{e.event_date.isoformat()} {e.event_type} {e.country or ''}: {e.description_en[:140]}",
                   title_ar=e.description_ar[:160] if e.description_ar else None, detail={"event_id": e.id, "source": src, "verification": e.verification}):
             n += 1
