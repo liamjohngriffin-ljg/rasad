@@ -156,9 +156,10 @@ def backup(keep: int = 30) -> dict:
 
 def link_incidents() -> dict:
     """Relink reports of the same incident across publishers over the whole record."""
+    init_db()  # adds any new columns first, so this is safe to run straight after an upgrade
     db = session_factory()()
     try:
-        return incidents.link(db, since=date(2024, 1, 1))
+        return {"ukmto_tidied": ukmto.tidy_descriptions(db), **incidents.link(db, since=date(2024, 1, 1))}
     finally:
         db.close()
 

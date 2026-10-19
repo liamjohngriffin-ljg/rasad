@@ -39,7 +39,7 @@ npm install
 npm run dev                                   # http://localhost:5173
 ```
 
-Tests: `cd backend && pytest -q` (39 tests: engine, policy maths, every connector against a real fixture, accounts, roles, licence, the API end to end).
+Tests: `cd backend && pytest -q` (47 tests: engine, policy maths, every connector against a real fixture, accounts, roles, licence, the API end to end).
 
 ## Daily operation
 

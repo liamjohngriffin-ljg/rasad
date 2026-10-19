@@ -1,6 +1,6 @@
 [project]
 name = "rasad"
-version = "0.3.0"
+version = "0.4.0"
 description = "Rasad: sovereign indicators-and-warnings engine for Gulf national security (working name)"
 requires-python = ">=3.11"
 dependencies = [

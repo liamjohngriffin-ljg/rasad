@@ -35,6 +35,8 @@ if (-not (Test-Path "data\.backfilled")) {
   & $exe @args0 -m rasad.pipelines.run backfill
   New-Item -ItemType File -Force -Path "data\.backfilled" | Out-Null
 }
+Write-Host "== Bringing the database up to this version" -ForegroundColor Cyan
+& $exe @args0 -m rasad.pipelines.run link
 if (-not $env:RASAD_ADMIN_PASSWORD) { $env:RASAD_ADMIN_PASSWORD = "change-me-on-first-login" }
 Write-Host "== Starting Rasad on http://localhost:8000 (sign in as admin / $env:RASAD_ADMIN_PASSWORD; close this window to stop)" -ForegroundColor Cyan
 Start-Job -ScriptBlock { Start-Sleep -Seconds 4; Start-Process "http://localhost:8000" } | Out-Null

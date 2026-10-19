@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.0 (19 October 2026)
+
+Analytical integrity
+- Cross-source incident linking: when UKMTO, JMIC and the MSCIO weekly report describe the same attack, the reports are linked (by position anchor, or as a labelled probable link on the same day and area). Indicators count incidents rather than reports, alerts fire once per incident, and one verification decision covers every report. Analysts can detach a report or link one by hand; their decisions are never overridden.
+- UKMTO updates no longer repeat the original narrative; stored rows and the shipped snapshot repaired on upgrade.
+
+Security
+- Two-factor sign-in with any authenticator app (RFC 6238), QR enrolment, eight single-use recovery codes, replay protection.
+- Organisation policy to require two-factor sign-in, enforced by the server: without a second factor a user reaches only the Account page.
+- Sessions end on password change, admin reset or deactivation; "sign out everywhere else" on the Account page; administrators can reset a lost second factor.
+
+Analysts
+- Analyst guide in English and Arabic inside the app (the ? beside your name).
+- Weekly situation brief (Board, Word export), series explorer with events on the same axis, Arabic resolution criteria and decision hooks, as-of date on the Board.
+- Verification queue grouped by incident with publisher badges.
+
+Operations
+- Whole suite runs against PostgreSQL 16 (RASAD_TEST_DATABASE_URL); live pipeline verified on PostgreSQL.
+- `python -m rasad.doctor` readiness report; `run link` upgrade step (the Windows launcher runs it on every start); SQLite online backups in the daily pipeline.
+
 ## 0.3.0 (18 October 2026)
 
 Live data
