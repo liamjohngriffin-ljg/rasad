@@ -8,7 +8,13 @@
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy no-referrer
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
 		-Server
+	}
+	# the largest legitimate upload is a logo (200 KB) or a licence file
+	request_body {
+		max_size 2MB
 	}
 	# defence in depth: the API already refuses paths outside its folders; nothing legitimate uses ".."
 	@traversal expression `{http.request.uri.path}.matches("(?i)(\\.\\.|%2e)")`

@@ -19,7 +19,7 @@ from ..briefs import generate as briefs
 from ..db import get_session
 from ..engine import alerts as alert_engine
 from ..models import Alert, Document, Forecast, PolicyObservation, Question, Source, ThreatEvent
-from .deps import check_language, current_user, require_role
+from .deps import check_language, require_client_header, current_user, require_role
 
 router = APIRouter(prefix="/api", tags=["daily"])
 
@@ -31,7 +31,7 @@ def _alert_row(a: Alert) -> dict:
 
 
 @router.get("/alerts")
-def list_alerts(all: bool = False, limit: int = 100, db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
+def list_alerts(all: bool = False, limit: int = Query(100, ge=1, le=1000), db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
     stmt = select(Alert).order_by(Alert.created_at.desc()).limit(limit)
     if not all:
         stmt = select(Alert).where(Alert.acknowledged_at.is_(None)).order_by(Alert.severity.desc(), Alert.created_at.desc()).limit(limit)
@@ -109,7 +109,7 @@ def _doc_row(d: Document, snippet_for: str | None = None) -> dict:
 
 
 @router.get("/search")
-def search(q: str = Query(min_length=2, max_length=120), days: int = 365, kind: str = "all", limit: int = 40, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+def search(q: str = Query(min_length=2, max_length=120), days: int = Query(365, ge=1, le=5000), kind: str = "all", limit: int = Query(40, ge=1, le=1000), db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
     since = date.today() - timedelta(days=days)
     like = f"%{q}%"
     out: dict = {"q": q, "events": [], "observations": [], "documents": []}
@@ -128,7 +128,7 @@ def search(q: str = Query(min_length=2, max_length=120), days: int = 365, kind: 
 
 
 @router.get("/documents")
-def list_documents(source: str | None = None, days: int = 14, limit: int = 100, db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
+def list_documents(source: str | None = None, days: int = Query(14, ge=1, le=5000), limit: int = Query(100, ge=1, le=1000), db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
     sdt = datetime.utcnow() - timedelta(days=days)
     stmt = select(Document).where(Document.fetched_at >= sdt).order_by(Document.fetched_at.desc()).limit(limit)
     if source:
@@ -167,7 +167,7 @@ def routing_terms(q: Question) -> list[str]:
 
 
 @router.get("/questions/{code}/documents")
-def question_documents(code: str, days: int = 14, limit: int = 40, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+def question_documents(code: str, days: int = Query(14, ge=1, le=5000), limit: int = Query(40, ge=1, le=1000), db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
     q = db.scalar(select(Question).where(Question.code == code))
     if q is None:
         raise HTTPException(404, "question not found")
@@ -272,8 +272,8 @@ def guide(lang: str = Query("en", pattern="^(en|ar)$"), user: User = Depends(cur
         return {"lang": lang, "content_md": f.read()}
 
 
-@router.get("/briefs/weekly")
-def weekly_brief(lang: str = Query("en", pattern="^(en|ar)$"), as_of: str | None = None, days: int = 7, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+@router.get("/briefs/weekly", dependencies=[Depends(require_client_header)])
+def weekly_brief(lang: str = Query("en", pattern="^(en|ar)$"), as_of: str | None = None, days: int = Query(7, ge=1, le=5000), db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
     check_language(lang)
     from ..briefs import weekly
 
@@ -284,7 +284,7 @@ def weekly_brief(lang: str = Query("en", pattern="^(en|ar)$"), as_of: str | None
 
 
 @router.get("/briefs/weekly/docx")
-def weekly_brief_docx(lang: str = Query("en", pattern="^(en|ar)$"), as_of: str | None = None, days: int = 7, db: Session = Depends(get_session), user: User = Depends(current_user)):
+def weekly_brief_docx(lang: str = Query("en", pattern="^(en|ar)$"), as_of: str | None = None, days: int = Query(7, ge=1, le=5000), db: Session = Depends(get_session), user: User = Depends(current_user)):
     check_language(lang)
     from ..briefs import weekly
 

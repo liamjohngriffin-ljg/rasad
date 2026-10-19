@@ -242,7 +242,7 @@ class RulePreview(BaseModel):
 
 
 @router.post("/indicators/preview")
-def preview_rule(req: RulePreview, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+def preview_rule(req: RulePreview, db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))) -> dict:
     _validate_rule(req.rule)
     d = date.fromisoformat(req.as_of) if req.as_of else date.today()
     stub = Indicator(code="preview", name_en="preview", lr_present=1.0, lr_absent=1.0, rule=req.rule)

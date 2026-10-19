@@ -34,22 +34,23 @@ def _setting(db: Session, key: str) -> str:
     return (get_setting(db, key) or "").strip()
 
 
-def check_url(url: str) -> None:
+def check_url(url: str) -> str | None:
     """HTTPS only, and not an address inside the deployment's own network (the webhook must not
     become a way to make the server call internal services)."""
     p = urlparse(url)
     if p.scheme != "https" or not p.hostname:
         raise ValueError("the webhook must be an https:// URL")
     if os.getenv("RASAD_WEBHOOK_ALLOW_PRIVATE", "").lower() in ("1", "true", "yes"):
-        return
+        return None
     try:
         infos = socket.getaddrinfo(p.hostname, p.port or 443, proto=socket.IPPROTO_TCP)
     except socket.gaierror:
         raise ValueError(f"cannot resolve {p.hostname}")
     for info in infos:
         ip = ipaddress.ip_address(info[4][0])
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
+        if not ip.is_global:  # private, loopback, link-local, carrier-grade NAT (100.64/10), reserved
             raise ValueError(f"{p.hostname} resolves to an internal address ({ip}); set RASAD_WEBHOOK_ALLOW_PRIVATE=true if that is intended")
+    return infos[0][4][0]  # the checked address, which the post then uses (no second DNS lookup)
 
 
 def _link(db: Session, a: Alert) -> str | None:
@@ -93,10 +94,19 @@ def _payload(db: Session, kind: str, alerts: list[Alert], extra: int = 0, test: 
 
 
 def _post(url: str, payload: dict) -> None:
-    check_url(url)
-    r = httpx.post(url, json=payload, timeout=20, follow_redirects=False)
+    ip = check_url(url)
+    # behind an outbound proxy the proxy resolves the name, so the request goes by name
+    if ip is None or os.getenv("HTTPS_PROXY") or os.getenv("https_proxy"):
+        r = httpx.post(url, json=payload, timeout=20, follow_redirects=False)
+    else:
+        # connect to the address that passed the check; TLS still verifies the real host name
+        u = httpx.URL(url)
+        pinned = u.copy_with(host=ip if ":" not in ip else f"[{ip}]")
+        with httpx.Client(timeout=20, follow_redirects=False) as c:
+            req = c.build_request("POST", pinned, json=payload, headers={"Host": u.netloc.decode()}, extensions={"sni_hostname": u.host})
+            r = c.send(req)
     if r.status_code >= 300:
-        raise RuntimeError(f"webhook answered {r.status_code}: {r.text[:200]}")
+        raise RuntimeError(f"webhook answered HTTP {r.status_code}")  # the body is not echoed back
 
 
 def push_new(db: Session) -> dict:

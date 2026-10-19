@@ -40,9 +40,29 @@ from ..models import (
 from ..policy import book as policy_book
 from . import admin_routes, auth_routes, daily_routes, workflow_routes
 from .. import licence
-from .deps import check_language, client_ip, current_user, require_role
+from .deps import check_language, require_client_header, client_ip, current_user, require_role
 
-app = FastAPI(title="Rasad API", version=__version__)
+# interactive API docs only when the operator asks for them (they map every route for a visitor)
+_docs = os.getenv("RASAD_API_DOCS", "").lower() in ("1", "true", "yes")
+app = FastAPI(title="Rasad API", version=__version__, docs_url="/api/docs" if _docs else None, redoc_url=None, openapi_url="/api/openapi.json" if _docs else None)
+
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    """The same headers the reverse proxy adds, so a laptop or proxy-less install has them too."""
+    resp = await call_next(request)
+    h = resp.headers
+    h.setdefault("X-Content-Type-Options", "nosniff")
+    h.setdefault("X-Frame-Options", "DENY")
+    h.setdefault("Referrer-Policy", "no-referrer")
+    h.setdefault("Content-Security-Policy", CSP)
+    if request.url.path.startswith("/api/"):
+        h.setdefault("Cache-Control", "no-store")
+    return resp
+
+
+CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; "
+       "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'")
 _dev_origins = [o.strip() for o in os.getenv("RASAD_CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=_dev_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.include_router(auth_routes.router)
@@ -220,7 +240,7 @@ def _event_row(e: ThreatEvent) -> dict:
 
 
 @app.get("/api/events")
-def events(days: int = 120, event_type: str | None = None, as_of: str | None = None, db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
+def events(days: int = Query(120, ge=1, le=5000), event_type: str | None = None, as_of: str | None = None, db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
     d = _as_of(as_of)
     stmt = select(ThreatEvent).where(ThreatEvent.event_date > d - timedelta(days=days), ThreatEvent.event_date <= d).order_by(ThreatEvent.event_date.desc())
     if event_type:
@@ -229,7 +249,7 @@ def events(days: int = 120, event_type: str | None = None, as_of: str | None = N
 
 
 @app.get("/api/series/{name}")
-def series(name: str, days: int = 365, as_of: str | None = None, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+def series(name: str, days: int = Query(365, ge=1, le=5000), as_of: str | None = None, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
     d = _as_of(as_of)
     pts = db.scalars(select(SeriesPoint).where(SeriesPoint.series == name, SeriesPoint.date > d - timedelta(days=days), SeriesPoint.date <= d).order_by(SeriesPoint.date)).all()
     return {
@@ -351,7 +371,7 @@ def calibration(db: Session = Depends(get_session), _: None = Depends(_record_ac
 
 
 @app.get("/api/forecasts/chain")
-def chain(limit: int = 200, db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
+def chain(limit: int = Query(200, ge=1, le=1000), db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
     rows = db.scalars(select(Forecast).order_by(Forecast.id.desc()).limit(limit)).all()
     return [
         {"id": r.id, "question": r.question.code, "as_of": r.as_of.isoformat(), "final_prob": r.final_prob, "prev_hash": r.prev_hash, "commit_hash": r.commit_hash, "committed_at": r.committed_at.isoformat()}
@@ -377,7 +397,7 @@ def commit_forecasts(req: CommitRequest, db: Session = Depends(get_session), use
 # ---------------------------------------------------------------------------
 
 
-@app.get("/api/briefs/{code}")
+@app.get("/api/briefs/{code}", dependencies=[Depends(require_client_header)])
 def brief(code: str, lang: str = Query("en", pattern="^(en|ar)$"), as_of: str | None = None, polish: bool = True, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
     check_language(lang)
     try:
@@ -395,7 +415,9 @@ class TaskingIn(BaseModel):
 
 @app.post("/api/tasking")
 def create_tasking(req: TaskingIn, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
-    t = TaskingRequest(text=req.text, requested_by=req.requested_by or user.username)
+    # "on behalf of" is kept, but the record always says who actually entered it
+    who = f"{req.requested_by.strip()} (entered by {user.username})" if req.requested_by and req.requested_by.strip() else user.username
+    t = TaskingRequest(text=req.text, requested_by=who[:120])
     db.add(t)
     db.commit()
     auth.audit(db, user, "tasking_created", str(t.id), {"text": req.text[:200]})

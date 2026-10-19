@@ -22,10 +22,17 @@ if ! command -v docker >/dev/null 2>&1; then
   apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin
 fi
 
-echo "== Firewall (ssh, http, https only)"
+echo "== Firewall"
 if command -v ufw >/dev/null 2>&1; then
   ufw allow OpenSSH >/dev/null || true
-  ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null; ufw allow 443/udp >/dev/null
+  if [ -n "$DOMAIN" ]; then
+    ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null; ufw allow 443/udp >/dev/null
+    echo "   ssh, http (redirects to https) and https open"
+  else
+    # no domain means no certificate: plain HTTP would carry passwords and session cookies in the
+    # clear, so the web ports stay closed and the platform is reached through an SSH tunnel
+    echo "   ssh only; reach the platform with:  ssh -L 8080:localhost:80 <user>@<this server>  then http://localhost:8080"
+  fi
   ufw --force enable >/dev/null
 fi
 
@@ -42,6 +49,7 @@ if [ ! -f .env ]; then
   sed -i "s/^RASAD_DB_PASSWORD=.*/RASAD_DB_PASSWORD=$(openssl rand -hex 24)/" .env
   sed -i "s/^RASAD_SECRET=.*/RASAD_SECRET=$(openssl rand -hex 32)/" .env
   sed -i "s/^DOMAIN=.*/DOMAIN=$DOMAIN/" .env
+  if [ -z "$DOMAIN" ]; then echo "RASAD_BIND=127.0.0.1" >> .env; fi
   chmod 600 .env
 fi
 
@@ -55,7 +63,9 @@ echo "Rasad is up."
 if [ -n "$DOMAIN" ]; then
   echo "  URL: https://$DOMAIN   (certificate is issued on first visit; allow a minute)"
 else
-  echo "  URL: http://<this server's IP>   (plain HTTP; set DOMAIN in .env and 'docker compose up -d' for TLS)"
+  echo "  No domain, so the platform listens on this server only. From your machine:"
+  echo "    ssh -L 8080:localhost:80 <user>@<this server>   then open http://localhost:8080"
+  echo "  For a team: point a hostname here, set DOMAIN=<hostname> and remove RASAD_BIND in .env, then 'docker compose up -d'"
 fi
 echo "  First admin password:"
 docker compose exec -T api cat /data/admin-password.txt 2>/dev/null || echo "   (set by RASAD_ADMIN_PASSWORD in .env)"

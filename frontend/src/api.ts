@@ -54,7 +54,7 @@ export type DocRow = { id: number; source: string; source_name: string; external
 export type SearchResult = { q: string; events: EventRow[]; observations: Observation[]; documents: DocRow[] }
 
 async function get<T>(path: string): Promise<T> {
-  const r = await fetch(path)
+  const r = await fetch(path, { headers: { 'X-Rasad-Client': 'web' } })
   if (!r.ok) throw new Error(`${r.status} ${path}`)
   return r.json() as Promise<T>
 }

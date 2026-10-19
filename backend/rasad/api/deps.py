@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..auth.core import parse_token_full
+from ..auth.core import parse_token_claims
 from ..auth.models import ApiKey, User
 from ..db import get_session
 
@@ -40,17 +40,24 @@ def current_user(request: Request, db: Session = Depends(get_session)) -> User:
         if u is None:
             raise HTTPException(401, "invalid API key")
         return u
-    tok = parse_token_full(request.cookies.get(COOKIE))
-    if tok is None:
+    claims = parse_token_claims(request.cookies.get(COOKIE))
+    if claims is None:
         raise HTTPException(401, "not signed in")
-    uid, sv = tok
+    uid, sv = claims["uid"], claims["sv"]
+    from ..auth.models import RevokedToken
+
+    if claims["n"] and db.get(RevokedToken, claims["n"]) is not None:
+        raise HTTPException(401, "signed out")
     if request.method not in SAFE_METHODS and request.headers.get(CLIENT_HEADER) is None:
         raise HTTPException(403, "missing client header")
     user = db.get(User, uid)
     if user is None or not user.active or (user.session_version or 0) != sv:
         raise HTTPException(401, "not signed in")
-    if not user.totp_enabled and not request.url.path.startswith("/api/auth/") and _mfa_required(db):
-        raise HTTPException(403, "mfa_enrolment_required")
+    if not request.url.path.startswith("/api/auth/"):
+        if user.must_change_password:
+            raise HTTPException(403, "password_change_required")
+        if not user.totp_enabled and _mfa_required(db):
+            raise HTTPException(403, "mfa_enrolment_required")
     return user
 
 
@@ -85,6 +92,13 @@ def require_feature(feature: str):
     return dep
 
 
+def require_client_header(request: Request) -> None:
+    """For GET routes that write or spend (brief generation, model polish): a cross-site link
+    carries the session cookie on a top-level navigation but cannot add this header."""
+    if not request.headers.get("authorization", "").lower().startswith("bearer ") and request.headers.get(CLIENT_HEADER) is None:
+        raise HTTPException(403, "missing client header")
+
+
 def check_language(lang: str) -> None:
     """Arabic output is a licensed module."""
     from .. import licence
@@ -106,9 +120,14 @@ def require_role(*roles: str):
 
 
 def client_ip(request: Request) -> str | None:
+    """The caller's address. X-Forwarded-For is believed only behind our own proxy
+    (RASAD_TRUST_PROXY=true, set in the compose file), and then only its last entry, which the
+    proxy wrote; anything earlier in the header came from the client and can be forged."""
+    import os
+
     fwd = request.headers.get("x-forwarded-for")
-    if fwd:
-        return fwd.split(",")[0].strip()
+    if fwd and os.getenv("RASAD_TRUST_PROXY", "").lower() in ("1", "true", "yes"):
+        return fwd.split(",")[-1].strip()
     return request.client.host if request.client else None
 
 

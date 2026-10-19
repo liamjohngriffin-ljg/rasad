@@ -29,6 +29,7 @@ services:
       RASAD_PUBLIC_RECORD: ${RASAD_PUBLIC_RECORD:-false}
       RASAD_CORS_ORIGINS: ""
       RASAD_DATA_DIR: /data
+      RASAD_TRUST_PROXY: "true"  # only Caddy reaches the API; its X-Forwarded-For entry is the real client
       RASAD_MARKING: ${RASAD_MARKING:-OFFICIAL}
       RASAD_LICENCE_FILE: ${RASAD_LICENCE_FILE:-}
       RASAD_SMTP_HOST: ${RASAD_SMTP_HOST:-}
@@ -55,9 +56,11 @@ services:
     environment:
       DOMAIN: ${DOMAIN:-:80}  # blank means plain HTTP on port 80 (Caddy needs an address, not an empty string)
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
+      # RASAD_BIND=127.0.0.1 (written by install.sh when there is no domain) keeps the web ports off
+      # the network; Docker's published ports bypass host firewalls such as ufw
+      - "${RASAD_BIND:-0.0.0.0}:80:80"
+      - "${RASAD_BIND:-0.0.0.0}:443:443"
+      - "${RASAD_BIND:-0.0.0.0}:443:443/udp"
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

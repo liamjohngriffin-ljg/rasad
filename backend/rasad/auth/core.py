@@ -37,12 +37,9 @@ def secret_key() -> bytes:
             _secret_cache = f.read().strip()
     else:
         _secret_cache = secrets.token_hex(32).encode("utf-8")
-        with open(path, "wb") as f:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "wb") as f:
             f.write(_secret_cache)
-        try:
-            os.chmod(path, 0o600)
-        except OSError:
-            pass
     return _secret_cache
 
 
@@ -72,7 +69,7 @@ def _unb64(s: str) -> bytes:
 
 
 def make_token(user_id: int, ttl: int = SESSION_TTL_SECONDS, session_version: int | None = 0) -> str:
-    payload = _b64(json.dumps({"uid": user_id, "sv": session_version or 0, "exp": int(time.time()) + ttl, "n": secrets.token_hex(4)}).encode())
+    payload = _b64(json.dumps({"uid": user_id, "sv": session_version or 0, "exp": int(time.time()) + ttl, "n": secrets.token_hex(8)}).encode())
     sig = _b64(hmac.new(secret_key(), payload.encode(), hashlib.sha256).digest())
     return f"{payload}.{sig}"
 
@@ -84,6 +81,12 @@ def parse_token(token: str | None) -> int | None:
 
 def parse_token_full(token: str | None) -> tuple[int, int] | None:
     """(user id, session version) from a valid, unexpired token."""
+    t = parse_token_claims(token)
+    return (t["uid"], t["sv"]) if t else None
+
+
+def parse_token_claims(token: str | None) -> dict | None:
+    """uid, sv (session version), n (nonce) and exp from a valid, unexpired token."""
     if not token or "." not in token:
         return None
     payload, sig = token.rsplit(".", 1)
@@ -96,7 +99,28 @@ def parse_token_full(token: str | None) -> tuple[int, int] | None:
         return None
     if data.get("exp", 0) < time.time():
         return None
-    return int(data["uid"]), int(data.get("sv", 0))
+    return {"uid": int(data["uid"]), "sv": int(data.get("sv", 0)), "n": str(data.get("n", "")), "exp": int(data.get("exp", 0))}
+
+
+def revoke_token(db: Session, token: str | None) -> None:
+    """End one session (sign out) without touching the user's other sessions."""
+    from .models import RevokedToken
+
+    claims = parse_token_claims(token)
+    if not claims or not claims["n"]:
+        return
+    if db.get(RevokedToken, claims["n"]) is None:
+        db.add(RevokedToken(nonce=claims["n"], expires_at=datetime.utcfromtimestamp(claims["exp"])))
+    db.query(RevokedToken).filter(RevokedToken.expires_at < datetime.utcnow()).delete()
+    db.commit()
+
+
+def normalise_username(username: str) -> str:
+    return (username or "").strip().lower()
+
+
+# verified against when the user does not exist, so an unknown name costs the same time as a known one
+_DUMMY_HASH = None
 
 
 def token_for(user: User) -> str:
@@ -130,7 +154,11 @@ def check_second_factor(db: Session, user: User, code: str | None) -> bool:
 def create_user(db: Session, username: str, password: str, role: str = "viewer", display_name: str | None = None, *, must_change: bool = False) -> User:
     if role not in ROLES:
         raise ValueError(f"role must be one of {ROLES}")
-    username = username.strip().lower()
+    username = normalise_username(username)
+    import re as _re
+
+    if not _re.fullmatch(r"[a-z0-9._@-]{2,64}", username):
+        raise ValueError("username: 2 to 64 characters, letters, digits and . _ @ - only")
     if db.scalar(select(User).where(User.username == username)):
         raise ValueError("username already exists")
     u = User(username=username, display_name=display_name or username, role=role, password_hash=hash_password(password), must_change_password=must_change)
@@ -140,8 +168,14 @@ def create_user(db: Session, username: str, password: str, role: str = "viewer",
 
 
 def authenticate(db: Session, username: str, password: str) -> User | None:
-    u = db.scalar(select(User).where(User.username == username.strip().lower()))
-    if u is None or not u.active or not verify_password(password, u.password_hash):
+    global _DUMMY_HASH
+    u = db.scalar(select(User).where(User.username == normalise_username(username)))
+    if u is None:
+        if _DUMMY_HASH is None:
+            _DUMMY_HASH = hash_password(secrets.token_hex(8))
+        verify_password(password, _DUMMY_HASH)
+        return None
+    if not verify_password(password, u.password_hash) or not u.active:
         return None
     u.last_login_at = datetime.utcnow()
     db.commit()
@@ -165,18 +199,17 @@ def bootstrap_admin(db: Session) -> str | None:
         pw = generated = secrets.token_urlsafe(12)
         path = os.path.join(get_settings().data_dir, "admin-password.txt")
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)  # never readable by others, not even briefly
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(pw + "\n")
-        try:
-            os.chmod(path, 0o600)
-        except OSError:
-            pass
     create_user(db, os.getenv("RASAD_ADMIN_USERNAME", "admin"), pw, "admin", "Administrator", must_change=generated is not None)
     return generated
 
 
 class LoginThrottle:
-    """Ten failed attempts per key per quarter hour, in memory; enough for a single instance."""
+    """Failed attempts per key per quarter hour, in memory; enough for a single instance. Sign-in
+    keeps two: one per account (any address, so spreading guesses across addresses does not help)
+    and one per address (so one address cannot spray many accounts)."""
 
     def __init__(self, limit: int = 10, window: int = 900) -> None:
         self.limit, self.window = limit, window

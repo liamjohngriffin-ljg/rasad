@@ -64,6 +64,15 @@ class ApiKey(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
+class RevokedToken(Base):
+    """Sessions ended by signing out: the token's nonce, kept until the token would have expired."""
+
+    __tablename__ = "revoked_tokens"
+
+    nonce: Mapped[str] = mapped_column(String(32), primary_key=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+
+
 class Setting(Base):
     """Operator-editable settings (branding, marking, defaults), keyed strings with JSON values."""
 

@@ -14,6 +14,9 @@ COPY backend/rasad ./rasad
 RUN pip install --no-cache-dir . && pip install --no-cache-dir "psycopg[binary]"
 COPY --from=web /web/dist ./static
 ENV RASAD_STATIC_DIR=/app/static RASAD_DATA_DIR=/data
+# run as an unprivileged user; /data is created owned by it so a new volume inherits the ownership
+RUN useradd --system --uid 10001 --home-dir /app --shell /usr/sbin/nologin rasad && mkdir -p /data && chown -R rasad:rasad /data
+USER rasad
 VOLUME ["/data"]
 EXPOSE 8000
 CMD ["uvicorn", "rasad.api.app:app", "--host", "0.0.0.0", "--port", "8000"]

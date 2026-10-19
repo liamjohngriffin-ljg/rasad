@@ -87,7 +87,7 @@ def run(probe: bool = True) -> dict:
                 probes.append({"host": host, "status": "not on allow-list"})
                 continue
             try:
-                with httpx.stream("GET", url, timeout=20, follow_redirects=True, headers={"User-Agent": "rasad/doctor"}) as r:
+                with httpx.stream("GET", url, timeout=20, follow_redirects=False, headers={"User-Agent": "rasad/doctor"}) as r:
                     probes.append({"host": host, "status": str(r.status_code)})  # headers only; large files are not downloaded
             except Exception as exc:  # noqa: BLE001
                 probes.append({"host": host, "status": f"{type(exc).__name__}"})

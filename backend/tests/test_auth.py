@@ -124,6 +124,8 @@ def test_two_factor_enrolment_login_recovery_and_policy(admin_client, anon_clien
     uid = r.json()["id"]
     c = make_client(None)
     assert c.post("/api/auth/login", json={"username": uname, "password": "first-password-1"}).status_code == 200
+    assert c.get("/api/board").status_code == 403  # a temporary password must be changed first
+    assert c.post("/api/auth/password", json={"current_password": "first-password-1", "new_password": "own-password-22"}).status_code == 200
     setup = c.post("/api/auth/mfa/setup").json()
     assert setup["uri"].startswith("otpauth://totp/") and setup["qr_svg"].startswith("<svg")
     assert c.post("/api/auth/mfa/enable", json={"code": "000000" if totp.code_at(setup["secret"], totp.current_step()) != "000000" else "111111"}).status_code == 400
@@ -133,12 +135,12 @@ def test_two_factor_enrolment_login_recovery_and_policy(admin_client, anon_clien
     assert len(codes) == 8 and c.get("/api/auth/me").json()["mfa_enabled"] is True
 
     fresh = make_client(None)
-    r = fresh.post("/api/auth/login", json={"username": uname, "password": "first-password-1"})
+    r = fresh.post("/api/auth/login", json={"username": uname, "password": "own-password-22"})
     assert r.status_code == 401 and r.json()["detail"] == "mfa_required"
-    assert fresh.post("/api/auth/login", json={"username": uname, "password": "first-password-1", "code": "123456x"}).status_code == 401
-    assert fresh.post("/api/auth/login", json={"username": uname, "password": "first-password-1", "code": codes[0]}).status_code == 200
+    assert fresh.post("/api/auth/login", json={"username": uname, "password": "own-password-22", "code": "123456x"}).status_code == 401
+    assert fresh.post("/api/auth/login", json={"username": uname, "password": "own-password-22", "code": codes[0]}).status_code == 200
     again = make_client(None)
-    assert again.post("/api/auth/login", json={"username": uname, "password": "first-password-1", "code": codes[0]}).status_code == 401  # spent
+    assert again.post("/api/auth/login", json={"username": uname, "password": "own-password-22", "code": codes[0]}).status_code == 401  # spent
     assert fresh.get("/api/auth/me").json()["recovery_codes_left"] == 7
 
     # sign out everywhere: the other session's cookie stops working, this one keeps going
@@ -150,14 +152,14 @@ def test_two_factor_enrolment_login_recovery_and_policy(admin_client, anon_clien
     assert admin.patch(f"/api/users/{uid}", json={"reset_mfa": True}).status_code == 200
     assert fresh.get("/api/board").status_code == 401
     plain = make_client(None)
-    assert plain.post("/api/auth/login", json={"username": uname, "password": "first-password-1"}).status_code == 200
+    assert plain.post("/api/auth/login", json={"username": uname, "password": "own-password-22"}).status_code == 200
 
     # organisation policy: without a second factor only the account endpoints answer
     assert admin.put("/api/settings", json={"values": {"require_mfa": "true"}}).status_code == 200
     try:
         assert plain.get("/api/board").status_code == 403
         assert plain.get("/api/auth/me").json()["must_enrol_mfa"] is True
-        assert plain.post("/api/auth/mfa/disable", json={"password": "first-password-1"}).status_code == 400
+        assert plain.post("/api/auth/mfa/disable", json={"password": "own-password-22"}).status_code == 400
     finally:
         # the admin has no second factor either, so the policy is lifted directly
         from rasad.auth.models import Setting

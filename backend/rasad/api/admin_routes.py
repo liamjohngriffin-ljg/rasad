@@ -197,19 +197,27 @@ def test_webhook(db: Session = Depends(get_session), admin: User = Depends(requi
 # ---------------------------------------------------------------------------
 
 
+def _cell(v):
+    """Text that a spreadsheet would run as a formula (=, +, -, @, tab, CR) is prefixed with a quote:
+    feed and analyst text must never execute when an export is opened in Excel."""
+    if isinstance(v, str) and v[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + v
+    return v
+
+
 def _csv(rows: list[dict], filename: str) -> StreamingResponse:
     buf = io.StringIO()
     if rows:
         w = csv.DictWriter(buf, fieldnames=list(rows[0].keys()))
         w.writeheader()
         for r in rows:
-            w.writerow({k: (json.dumps(v, ensure_ascii=False) if isinstance(v, (dict, list)) else v) for k, v in r.items()})
+            w.writerow({k: _cell(json.dumps(v, ensure_ascii=False) if isinstance(v, (dict, list)) else v) for k, v in r.items()})
     data = ("﻿" + buf.getvalue()).encode("utf-8")
     return StreamingResponse(io.BytesIO(data), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 @router.get("/export/events.csv", dependencies=[Depends(require_feature("export"))])
-def export_events(days: int = 365, verified_only: bool = False, db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))):
+def export_events(days: int = Query(365, ge=1, le=5000), verified_only: bool = False, db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))):
     since = date.today() - timedelta(days=days)
     stmt = select(ThreatEvent).where(ThreatEvent.event_date >= since).order_by(ThreatEvent.event_date)
     if verified_only:
@@ -220,7 +228,7 @@ def export_events(days: int = 365, verified_only: bool = False, db: Session = De
 
 
 @router.get("/export/observations.csv", dependencies=[Depends(require_feature("export"))])
-def export_observations(days: int = 365, db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))):
+def export_observations(days: int = Query(365, ge=1, le=5000), db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))):
     since = date.today() - timedelta(days=days)
     rows = [{"id": o.id, "observed_at": o.observed_at.isoformat(), "actor": o.actor.code, "issue": o.issue.code, "track": o.track, "channel": o.channel, "cost_class": o.cost_class, "speaker_level": o.speaker_level, "language": o.language, "score": o.score, "source_grade": o.source_grade, "model_confidence": o.model_confidence, "text_excerpt": o.text_excerpt, "text_excerpt_en": o.text_excerpt_en, "source": (o.provenance or {}).get("source"), "url": (o.provenance or {}).get("url"), "verification": o.verification, "is_synthetic": o.is_synthetic} for o in db.scalars(select(PolicyObservation).where(PolicyObservation.observed_at >= since).order_by(PolicyObservation.observed_at))]
     auth.audit(db, user, "export", "observations.csv", {"rows": len(rows)})
@@ -228,7 +236,7 @@ def export_observations(days: int = 365, db: Session = Depends(get_session), use
 
 
 @router.get("/export/series.csv", dependencies=[Depends(require_feature("export"))])
-def export_series(name: str = Query(min_length=2), days: int = 1000, db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))):
+def export_series(name: str = Query(min_length=2, max_length=80, pattern="^[a-z0-9_]+$"), days: int = Query(1000, ge=1, le=5000), db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))):
     since = date.today() - timedelta(days=days)
     rows = [{"series": p.series, "date": p.date.isoformat(), "value": p.value, "unit": p.unit, "source": p.source, "is_synthetic": p.is_synthetic} for p in db.scalars(select(SeriesPoint).where(SeriesPoint.series == name, SeriesPoint.date >= since).order_by(SeriesPoint.date))]
     auth.audit(db, user, "export", f"series:{name}", {"rows": len(rows)})

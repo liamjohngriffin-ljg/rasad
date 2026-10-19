@@ -17,8 +17,7 @@ _lic_dir = _tempfile.mkdtemp(prefix="rasad-lic-")
 from rasad import licence as _licence  # noqa: E402
 
 _pub = _licence.keygen(os.path.join(_lic_dir, "vendor.key"))
-os.environ["RASAD_VENDOR_PUBLIC_KEY"] = _pub
-_licence.VENDOR_PUBLIC_KEY_B64 = _pub
+_licence.VENDOR_PUBLIC_KEY_B64 = _pub  # tests patch the constant; the product has no override
 with open(os.path.join(_lic_dir, "licence.json"), "w", encoding="utf-8") as _f:
     _json.dump(_licence.issue(os.path.join(_lic_dir, "vendor.key"), licensee="Test suite", seats=50, expires="2099-01-01", features=["core", "arabic", "api", "model", "export"]), _f)
 os.environ["RASAD_LICENCE_FILE"] = os.path.join(_lic_dir, "licence.json")

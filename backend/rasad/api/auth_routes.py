@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel
+from fastapi import Query, APIRouter, Depends, HTTPException, Request, Response
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -13,7 +13,8 @@ from ..db import get_session
 from .deps import COOKIE, client_ip, cookie_secure, current_user, require_role
 
 router = APIRouter(prefix="/api")
-throttle = auth.LoginThrottle()
+throttle = auth.LoginThrottle(limit=10)  # per account, from any address
+ip_throttle = auth.LoginThrottle(limit=30)  # per address, across accounts
 
 
 def _user_row(u: User) -> dict:
@@ -42,28 +43,37 @@ def _set_session(response: Response, request: Request, u: User) -> None:
 
 
 class LoginIn(BaseModel):
-    username: str
-    password: str
+    username: str = Field(max_length=200)
+    password: str = Field(max_length=1000)
     code: str | None = None  # authenticator code or a recovery code, when the account has two-factor sign-in
 
 
 @router.post("/auth/login")
 def login(req: LoginIn, request: Request, response: Response, db: Session = Depends(get_session)) -> dict:
-    key = f"{req.username.lower()}|{client_ip(request)}"
-    if throttle.blocked(key):
+    uname = auth.normalise_username(req.username)[:64]
+    key, ipkey = f"acct|{uname}", f"ip|{client_ip(request)}"
+    if throttle.blocked(key) or ip_throttle.blocked(ipkey):
         raise HTTPException(429, "too many attempts; try again in 15 minutes")
-    user = auth.authenticate(db, req.username, req.password)
+    user = auth.authenticate(db, uname, req.password)
     if user is None:
         throttle.hit(key)
-        auth.audit(db, None, "login_failed", req.username.lower(), ip=client_ip(request))
+        ip_throttle.hit(ipkey)
+        auth.audit(db, None, "login_failed", uname, ip=client_ip(request))
         raise HTTPException(401, "wrong username or password")
     if user.totp_enabled:
         if not req.code:
             raise HTTPException(401, "mfa_required")
         if not auth.check_second_factor(db, user, req.code):
-            throttle.hit(key)
+            throttle.hit(key)  # second-factor guesses share the account's budget: ten per quarter hour
+            ip_throttle.hit(ipkey)
             auth.audit(db, user, "login_failed_mfa", ip=client_ip(request))
             raise HTTPException(401, "mfa_invalid")
+    if user.role != "admin":
+        from .. import licence
+
+        active = db.scalar(select(func.count(User.id)).where(User.active.is_(True))) or 0
+        if active > licence.current().seats:
+            raise HTTPException(403, f"more active users ({active}) than licensed seats ({licence.current().seats}); an administrator must deactivate users or install a larger licence")
     throttle.clear(key)
     _set_session(response, request, user)
     auth.audit(db, user, "login", None, {"mfa": bool(user.totp_enabled)}, ip=client_ip(request))
@@ -72,6 +82,7 @@ def login(req: LoginIn, request: Request, response: Response, db: Session = Depe
 
 @router.post("/auth/logout")
 def logout(request: Request, response: Response, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+    auth.revoke_token(db, request.cookies.get(COOKIE))  # the cookie stops working even if a copy was kept
     response.delete_cookie(COOKIE, path="/")
     auth.audit(db, user, "logout", ip=client_ip(request))
     return {"ok": True}
@@ -250,6 +261,13 @@ def patch_user(user_id: int, req: UserPatch, request: Request, db: Session = Dep
     if req.active is not None:
         if u.id == admin.id and not req.active:
             raise HTTPException(400, "you cannot deactivate yourself")
+        if req.active and not u.active:
+            from .. import licence
+
+            st = licence.current()
+            active = db.scalar(select(func.count(User.id)).where(User.active.is_(True))) or 0
+            if active >= st.seats:
+                raise HTTPException(403, f"seat limit reached ({st.seats} seats, {st.mode} mode); deactivate someone or install a licence with more seats")
         u.active, changes["active"] = req.active, req.active
     if req.display_name is not None:
         u.display_name, changes["display_name"] = req.display_name, req.display_name
@@ -270,7 +288,7 @@ def patch_user(user_id: int, req: UserPatch, request: Request, db: Session = Dep
 
 
 @router.get("/audit")
-def audit_log(limit: int = 200, db: Session = Depends(get_session), _: User = Depends(require_role("admin"))) -> list[dict]:
+def audit_log(limit: int = Query(200, ge=1, le=1000), db: Session = Depends(get_session), _: User = Depends(require_role("admin"))) -> list[dict]:
     rows = db.scalars(select(AuditLog).order_by(AuditLog.id.desc()).limit(min(limit, 1000))).all()
     return [{"id": r.id, "at": r.at.isoformat(), "user": r.username, "action": r.action, "target": r.target, "detail": r.detail, "ip": r.ip} for r in rows]
 

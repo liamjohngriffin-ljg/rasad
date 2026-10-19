@@ -29,8 +29,9 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
-# Replaced at build time for each vendor key; the default matches the key issued with this release.
-VENDOR_PUBLIC_KEY_B64 = os.getenv("RASAD_VENDOR_PUBLIC_KEY", "aKD6nj3+rRDRhk8wpn1m+RMAKXUXnZwSaE2LvZmb8q4=")
+# The vendor's public key, fixed in the code. There is deliberately no environment override: a
+# customer controls the environment, and an override would let anyone sign their own licence.
+VENDOR_PUBLIC_KEY_B64 = "aKD6nj3+rRDRhk8wpn1m+RMAKXUXnZwSaE2LvZmb8q4="
 EVALUATION_SEATS = 3
 GRACE_DAYS = 30
 ALL_FEATURES = ("core", "arabic", "api", "model", "export")
@@ -128,12 +129,12 @@ def main(argv: list[str]) -> None:
         return
     if argv[0] == "keygen":
         pub = keygen(argv[1] if len(argv) > 1 else "vendor.key")
-        print(f"public key (set RASAD_VENDOR_PUBLIC_KEY or replace VENDOR_PUBLIC_KEY_B64): {pub}")
+        print(f"public key (put it in VENDOR_PUBLIC_KEY_B64 in rasad/licence.py and build a release): {pub}")
         return
     if argv[0] == "verify":
         with open(argv[1], encoding="utf-8") as f:
             doc = json.load(f)
-        payload = verify(doc, os.getenv("RASAD_VENDOR_PUBLIC_KEY") or None)
+        payload = verify(doc, os.getenv("RASAD_VERIFY_WITH_KEY") or None)  # vendor-side check of a file against another key
         print(json.dumps(payload, indent=1))
         return
     import argparse
