@@ -53,6 +53,9 @@ def load_questions(db: Session, opened_at: date) -> None:
             )
             db.add(q)
             db.flush()
+        ar = reference.QUESTIONS_AR.get(code)
+        if ar and not q.resolution_criteria_ar:
+            q.resolution_criteria_ar, q.decision_hooks_ar = ar[0], ar[1]
         # indicators added to the reference after a database was created are appended (never overwritten:
         # an analyst's edits to an existing indicator stand)
         have = {i.code for i in q.indicators}

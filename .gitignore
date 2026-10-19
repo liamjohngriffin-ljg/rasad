@@ -10,3 +10,4 @@ frontend/dist/
 .env
 .DS_Store
 backups/
+*.egg-info/

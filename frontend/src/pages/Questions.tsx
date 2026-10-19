@@ -78,14 +78,14 @@ function IndicatorForm({ initial, vocab, onSave, onCancel }: { initial: Indicato
 
 function QuestionEditor({ q, vocab, onChanged }: { q: QuestionDef; vocab: Vocab | null; onChanged: () => void }) {
   const { t } = useLang()
-  const [form, setForm] = useState({ title_en: q.title_en, title_ar: q.title_ar ?? '', horizon_days: q.horizon_days, base_rate: q.base_rate, base_rate_note: q.base_rate_note ?? '', resolution_criteria: q.resolution_criteria, hooks: q.decision_hooks.join('\n') })
+  const [form, setForm] = useState({ title_en: q.title_en, title_ar: q.title_ar ?? '', horizon_days: q.horizon_days, base_rate: q.base_rate, base_rate_note: q.base_rate_note ?? '', resolution_criteria: q.resolution_criteria, resolution_criteria_ar: q.resolution_criteria_ar ?? '', hooks: q.decision_hooks.join('\n'), hooks_ar: (q.decision_hooks_ar ?? []).join('\n') })
   const [msg, setMsg] = useState<string | null>(null)
   const [editing, setEditing] = useState<IndicatorDef | null>(null)
   const [resolve, setResolve] = useState<{ outcome: boolean; notes: string } | null>(null)
   const frozen = q.status !== 'open'
   const save = async () => {
     try {
-      await api.updateQuestion(q.code, { title_en: form.title_en, title_ar: form.title_ar || null, horizon_days: form.horizon_days, base_rate: form.base_rate, base_rate_note: form.base_rate_note || null, resolution_criteria: form.resolution_criteria, decision_hooks: form.hooks.split('\n').map((s) => s.trim()).filter(Boolean) })
+      await api.updateQuestion(q.code, { title_en: form.title_en, title_ar: form.title_ar || null, horizon_days: form.horizon_days, base_rate: form.base_rate, base_rate_note: form.base_rate_note || null, resolution_criteria: form.resolution_criteria, resolution_criteria_ar: form.resolution_criteria_ar || null, decision_hooks: form.hooks.split('\n').map((s) => s.trim()).filter(Boolean), decision_hooks_ar: form.hooks_ar.split('\n').map((s) => s.trim()).filter(Boolean) })
       setMsg(t('saved')); onChanged()
     } catch (e) { setMsg(`${t('errorPrefix')}: ${String(e)}`) }
   }
@@ -106,6 +106,8 @@ function QuestionEditor({ q, vocab, onChanged }: { q: QuestionDef; vocab: Vocab 
         <Field l={t('baseRateNote')}><input className={input} disabled={frozen} value={form.base_rate_note} onChange={(e) => setForm({ ...form, base_rate_note: e.target.value })} /></Field>
         <Field l={t('criteria')}><textarea className={input} rows={3} disabled={frozen} value={form.resolution_criteria} onChange={(e) => setForm({ ...form, resolution_criteria: e.target.value })} /></Field>
         <Field l={t('hooks')}><textarea className={input} rows={3} disabled={frozen} value={form.hooks} onChange={(e) => setForm({ ...form, hooks: e.target.value })} /></Field>
+        <Field l={t('criteria') + ' (ar)'}><textarea className={input} dir="rtl" rows={3} disabled={frozen} value={form.resolution_criteria_ar} onChange={(e) => setForm({ ...form, resolution_criteria_ar: e.target.value })} /></Field>
+        <Field l={t('hooks') + ' (ar)'}><textarea className={input} dir="rtl" rows={3} disabled={frozen} value={form.hooks_ar} onChange={(e) => setForm({ ...form, hooks_ar: e.target.value })} /></Field>
       </div>
       {!frozen && (
         <div className="flex gap-2 items-center">
@@ -162,7 +164,7 @@ function NewQuestion({ onCreated }: { onCreated: () => void }) {
     <form className="card p-5 grid gap-3" onSubmit={async (e) => {
       e.preventDefault()
       try {
-        await api.createQuestion({ code: f.code, title_en: f.title_en, title_ar: f.title_ar || null, horizon_days: f.horizon_days, base_rate: f.base_rate, base_rate_note: f.base_rate_note || null, resolution_criteria: f.resolution_criteria, decision_hooks: f.hooks.split('\n').map((s) => s.trim()).filter(Boolean), indicators: [] })
+        await api.createQuestion({ code: f.code, title_en: f.title_en, title_ar: f.title_ar || null, horizon_days: f.horizon_days, base_rate: f.base_rate, base_rate_note: f.base_rate_note || null, resolution_criteria: f.resolution_criteria, resolution_criteria_ar: null, decision_hooks: f.hooks.split('\n').map((s) => s.trim()).filter(Boolean), decision_hooks_ar: null, indicators: [] })
         setF({ ...f, code: '', title_en: '', title_ar: '', resolution_criteria: '', hooks: '' }); setErr(null); onCreated()
       } catch (ex) { setErr(String(ex)) }
     }}>

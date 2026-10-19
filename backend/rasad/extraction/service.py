@@ -95,10 +95,19 @@ def process_document(db: Session, doc: Document) -> tuple[int, int]:
     return n_e, n_o
 
 
+# sources whose documents are read by a dedicated parser (PDF library, data services); the lexicon
+# extractor runs on wires and news only, where a sentence is a claim rather than a whole report
+PARSED_SOURCES = {"ukmto", "jmic", "mscio", "jwc", "portwatch", "ofac", "uk_sanctions", "state_fms"}
+
+
 def process_pending(db: Session, limit: int = 200) -> dict:
     docs = db.scalars(select(Document).where(Document.status == "ingested").order_by(Document.fetched_at).limit(limit)).all()
     tot_e = tot_o = 0
     for d in docs:
+        if d.source.code in PARSED_SOURCES:
+            d.status = "stored"
+            db.commit()
+            continue
         e, o = process_document(db, d)
         tot_e += e
         tot_o += o

@@ -45,6 +45,8 @@ Tests: `cd backend && pytest -q` (39 tests: engine, policy maths, every connecto
 
 `python -m rasad.pipelines.run daily` (the scheduler container runs it at `RASAD_PIPELINE_TIME`) polls every feed, extracts pending evidence, commits the day's forecasts to the chain, raises alerts and sends the digest. Other commands: `poll`, `extract`, `commit`, `backfill` (first run), `ingest-dir <folder>` (a folder of PDFs on an air-gapped host), `snapshot` (export real rows into the seed), `digest`. Feeds are configured in `<data dir>/urls.yaml`; the egress allow-list is `RASAD_EGRESS_ALLOWLIST`.
 
+`python -m rasad.doctor` prints a readiness report (database, licence, chain, source freshness, reachability of every feed host) and exits non-zero when a deployment dependency is broken; support asks for its output first.
+
 Analysts work from the Today page (alerts, moves, new events), the verification queue, the Questions editor (indicators with a rule preview), Evidence entry and Tasking. Every write is attributed and audited. Briefs export to Word with the marking in the header and footer.
 
 ## Licensing

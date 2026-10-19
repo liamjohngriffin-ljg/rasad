@@ -146,11 +146,12 @@ def render_template(db: Session, question: Question, as_of: date, lang: str = "e
         out.append(s["no_panel"])
     out.append("")
     out.append(f"## {s['decisions']}")
-    for h in question.decision_hooks or []:
+    hooks = (question.decision_hooks_ar if lang == "ar" and question.decision_hooks_ar else question.decision_hooks) or []
+    for h in hooks:
         out.append(f"- {h}")
     out.append("")
     out.append(f"## {s['resolution']}")
-    out.append(question.resolution_criteria)
+    out.append(question.resolution_criteria_ar if lang == "ar" and question.resolution_criteria_ar else question.resolution_criteria)
     if synth_share > 0:
         out.append("")
         out.append(f"_{s['synthetic']}_")

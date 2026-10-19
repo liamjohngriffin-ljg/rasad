@@ -8,15 +8,16 @@ export default function Board() {
   const { t, lang } = useLang()
   const [qs, setQs] = useState<QuestionSummary[]>([])
   const [asOf, setAsOf] = useState<string>('')
+  const [pick, setPick] = useState<string>('')
   const [text, setText] = useState('')
   const [sent, setSent] = useState(false)
-  useEffect(() => { api.board().then((b) => { setQs(b.questions); setAsOf(b.as_of) }) }, [])
+  useEffect(() => { api.board(pick || undefined).then((b) => { setQs(b.questions); setAsOf(b.as_of) }) }, [pick])
   const title = (q: QuestionSummary) => (lang === 'ar' && q.title_ar ? q.title_ar : q.title_en)
   return (
     <div>
       <div className="flex items-baseline justify-between mb-4">
         <h1 className="text-xl font-semibold">{t('board')}</h1>
-        <span className="muted text-sm">{t('asOf')} <span className="mono">{asOf}</span></span>
+        <span className="flex items-center gap-3"><Link className="btn text-xs" to="/weekly">{t('weeklyBrief')}</Link><span className="muted text-sm">{t('asOf')} <input type="date" className="bg-transparent border border-[var(--line)] rounded px-2 py-0.5 mono text-xs" value={pick || asOf} onChange={(e) => setPick(e.target.value)} />{pick && <button className="btn text-xs ms-1" onClick={() => setPick('')}>×</button>}</span></span>
       </div>
       <div className="grid gap-3">
         {qs.map((q) => (

@@ -172,3 +172,12 @@ def test_sources_freshness_series_index_and_bulk_verify(client):
         r = client.post("/api/verification/bulk", json={"kind": "event", "ids": ids, "decision": "verified"}).json()
         assert r["n"] == len(ids)
     assert client.post("/api/verification/bulk", json={"kind": "event", "ids": [], "decision": "maybe"}).status_code == 400
+
+
+def test_weekly_brief(client):
+    en = client.get("/api/briefs/weekly?lang=en&as_of=2026-10-18").json()
+    assert en["content_md"].startswith("# Weekly situation brief") and "## The board" in en["content_md"] and "## Reported incidents" in en["content_md"]
+    ar = client.get("/api/briefs/weekly?lang=ar&as_of=2026-10-18").json()
+    assert "موجز الموقف الأسبوعي" in ar["content_md"]
+    r = client.get("/api/briefs/weekly/docx?lang=en&as_of=2026-10-18")
+    assert r.status_code == 200 and len(r.content) > 5000

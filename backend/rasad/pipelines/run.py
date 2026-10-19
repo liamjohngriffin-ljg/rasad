@@ -5,6 +5,7 @@
   python -m rasad.pipelines.run commit      commit today's forecasts to the chain
   python -m rasad.pipelines.run daily       all three, in order, then the alert digest
   python -m rasad.pipelines.run digest      email unacknowledged alerts (RASAD_SMTP_HOST, RASAD_DIGEST_TO)
+  python -m rasad.pipelines.run backup [keep]   SQLite online backup into <data dir>/backups (default keeps 30)
   python -m rasad.pipelines.run backfill    first run: PortWatch since 2024, every MSCIO folder, the sanctions lists
   python -m rasad.pipelines.run ingest-dir <path> [folder]   ingest a directory of PDFs (air-gapped hosts)
   python -m rasad.pipelines.run snapshot [path]              export real ledger rows to the seed snapshot
@@ -121,6 +122,34 @@ def commit(as_of: date | None = None) -> dict:
         db.close()
 
 
+def backup(keep: int = 30) -> dict:
+    """SQLite deployments (laptop, single host): copy the database with the online backup API
+    into <data dir>/backups and keep the newest `keep` copies. PostgreSQL deployments use the
+    backup container (pg_dump) instead."""
+    import shutil
+    import sqlite3
+
+    url = get_settings().database_url
+    if not url.startswith("sqlite"):
+        return {"skipped": "not a SQLite database; the compose backup service runs pg_dump"}
+    src = url.replace("sqlite:///", "", 1)
+    if not os.path.exists(src):
+        return {"skipped": f"{src} not found"}
+    out_dir = os.path.join(get_settings().data_dir, "backups")
+    os.makedirs(out_dir, exist_ok=True)
+    stamp = date.today().isoformat()
+    dest = os.path.join(out_dir, f"rasad-{stamp}.db")
+    with sqlite3.connect(src) as con, sqlite3.connect(dest) as bak:
+        con.backup(bak)
+    olds = sorted(f for f in os.listdir(out_dir) if f.startswith("rasad-") and f.endswith(".db"))
+    removed = []
+    for f in olds[:-keep] if len(olds) > keep else []:
+        os.remove(os.path.join(out_dir, f))
+        removed.append(f)
+    free = shutil.disk_usage(out_dir).free // (1024 * 1024)
+    return {"backup": dest, "size_mb": round(os.path.getsize(dest) / (1024 * 1024), 1), "kept": min(len(olds), keep), "removed": removed, "free_mb": free}
+
+
 def digest() -> dict:
     db = session_factory()()
     try:
@@ -165,6 +194,8 @@ def main(argv: list[str]) -> None:
         print(digest())
     elif cmd == "digest":
         print(digest())
+    elif cmd == "backup":
+        print(backup(int(argv[1]) if len(argv) > 1 else 30))
     elif cmd == "ingest-dir":
         print(ingest_dir(argv[1], argv[2] if len(argv) > 2 else "local"))
     elif cmd == "snapshot":

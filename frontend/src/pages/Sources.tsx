@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { useLang } from '../i18n'
 
@@ -34,7 +35,7 @@ export default function Sources() {
           <tbody>
             {idx.map((r) => (
               <tr key={r.series} className={r.synthetic > 0 ? 'opacity-80' : ''}>
-                <td className="mono text-xs">{r.series}{r.synthetic > 0 && <span className="tag demo ms-2">{r.synthetic} demo</span>}</td>
+                <td className="mono text-xs"><Link className="hover:text-[var(--accent)]" to={`/series?s=${r.series}`}>{r.series}</Link>{r.synthetic > 0 && <span className="tag demo ms-2">{r.synthetic} demo</span>}</td>
                 <td className="mono">{r.points}</td><td className="mono text-xs">{r.first}</td><td className="mono text-xs">{r.last}</td>
                 <td className="mono">{r.latest_value}</td>
                 <td className={`mono ${r.days_stale > 30 ? 'text-[var(--up)]' : ''}`}>{r.days_stale}</td>

@@ -115,7 +115,7 @@ class ThreatEvent(Base):
     # gnss_interference, mine_warning, cyber_incident, airspace_closure, insurer_listing,
     # expulsion, deployment, exercise, statement_threat
     location_name: Mapped[str | None] = mapped_column(String(200))
-    country: Mapped[str | None] = mapped_column(String(8))
+    country: Mapped[str | None] = mapped_column(String(16))
     lat: Mapped[float | None] = mapped_column(Float)
     lon: Mapped[float | None] = mapped_column(Float)
     actor_id: Mapped[int | None] = mapped_column(ForeignKey("actors.id"))
@@ -202,7 +202,9 @@ class Question(Base):
     title_ar: Mapped[str | None] = mapped_column(String(300))
     horizon_days: Mapped[int] = mapped_column(Integer)
     resolution_criteria: Mapped[str] = mapped_column(Text)
+    resolution_criteria_ar: Mapped[str | None] = mapped_column(Text)
     decision_hooks: Mapped[list] = mapped_column(JSON, default=list)
+    decision_hooks_ar: Mapped[list | None] = mapped_column(JSON)
     base_rate: Mapped[float] = mapped_column(Float)  # status-quo baseline probability for the horizon
     base_rate_note: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(16), default="open")  # open, resolved

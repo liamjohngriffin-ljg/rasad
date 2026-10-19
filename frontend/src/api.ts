@@ -15,7 +15,7 @@ export type IndicatorDetail = {
   lr_absent: number | null; rule: Record<string, unknown> | null; state: string; log_lr: number; evidence: Record<string, unknown>; events: EventRow[]
 }
 export type QuestionDetail = QuestionSummary & {
-  resolution_criteria: string; base_rate_note: string | null; opened_at: string
+  resolution_criteria: string; resolution_criteria_ar: string | null; decision_hooks_ar: string[] | null; base_rate_note: string | null; opened_at: string
   machine: { prior: number; probability: number; log_odds: number } | null
   panel: { probability: number; median: number; low: number; high: number; n: number; raw_mean: number } | null
   machine_weight: number | null; indicators: IndicatorDetail[]; history_90: HistoryPoint[]; prev_hash: string | null
@@ -72,7 +72,7 @@ const del = <T,>(path: string) => send<T>('DELETE', path)
 
 export type IndicatorDef = { id?: number; code: string; name_en: string; name_ar: string | null; description: string | null; lr_present: number; lr_absent: number; polarity: string; rule: Record<string, unknown> }
 export type QuestionDef = {
-  code: string; title_en: string; title_ar: string | null; horizon_days: number; resolution_criteria: string; decision_hooks: string[]; base_rate: number
+  code: string; title_en: string; title_ar: string | null; horizon_days: number; resolution_criteria: string; resolution_criteria_ar: string | null; decision_hooks: string[]; decision_hooks_ar: string[] | null; base_rate: number
   base_rate_note: string | null; status: string; opened_at: string; resolves_at: string; order: number; indicators: IndicatorDef[]
 }
 export type Vocab = {

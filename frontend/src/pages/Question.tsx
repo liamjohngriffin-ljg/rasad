@@ -64,6 +64,7 @@ function EvidenceBlock({ ind }: { ind: IndicatorDetail }) {
   const rows: string[] = []
   if (ev.series && ev.value !== undefined) rows.push(`${ev.series} = ${ev.value} ${ev.unit ?? ''} (${ev.date})${ev.is_synthetic ? ' · demo' : ''}`)
   if (ev.recent_mean !== undefined) rows.push(`${ev.series}: ${ev.recent_mean} vs ${ev.baseline_mean} (ratio ${ev.ratio}, threshold ${ev.threshold})`)
+  if (ev.pending_extractions_excluded) rows.push(`${ev.pending_extractions_excluded} unverified extractions not counted`)
   if (ev.score !== undefined && ev.actor) rows.push(`${ev.actor} / ${ev.issue} (${ev.track ?? ''}): ${ev.score} from ${ev.n} observations`)
   if (ev.divergence !== undefined) rows.push(`${ev.actor} / ${ev.issue}: divergence ${ev.divergence} (threshold ${ev.threshold})`)
   if (ev.recent_count !== undefined && ev.expected_in_window !== undefined) rows.push(`${ev.actor} / ${ev.issue}: ${ev.recent_count} statements vs ${ev.expected_in_window} expected`)
@@ -72,6 +73,7 @@ function EvidenceBlock({ ind }: { ind: IndicatorDetail }) {
   return (
     <div className="mt-2 text-sm">
       {rows.map((r, i) => <div key={i} className="muted mono text-xs">{r}</div>)}
+      {typeof ev.series === 'string' && <Link className="accent text-xs" to={`/series?s=${ev.series}&days=365`}>↗ {String(ev.series)}</Link>}
       {ind.events.length > 0 && (
         <ul className="mt-1 space-y-1">
           {ind.events.map((e) => (
@@ -153,8 +155,8 @@ export default function Question() {
       <RelatedDocs code={q.code} />
 
       <div className="grid md:grid-cols-2 gap-4">
-        <div className="card p-5"><h2 className="font-medium mb-2">{t('decisions')}</h2><ul className="list-disc ps-5 text-sm">{q.decision_hooks.map((h) => <li key={h}>{h}</li>)}</ul></div>
-        <div className="card p-5"><h2 className="font-medium mb-2">{t('resolution')}</h2><p className="text-sm">{q.resolution_criteria}</p></div>
+        <div className="card p-5"><h2 className="font-medium mb-2">{t('decisions')}</h2><ul className="list-disc ps-5 text-sm">{(lang === 'ar' && q.decision_hooks_ar?.length ? q.decision_hooks_ar : q.decision_hooks).map((h) => <li key={h}>{h}</li>)}</ul></div>
+        <div className="card p-5"><h2 className="font-medium mb-2">{t('resolution')}</h2><p className="text-sm">{lang === 'ar' && q.resolution_criteria_ar ? q.resolution_criteria_ar : q.resolution_criteria}</p></div>
       </div>
     </div>
   )

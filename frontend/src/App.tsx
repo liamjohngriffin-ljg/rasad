@@ -26,6 +26,7 @@ export default function App() {
             <NavLink to="/" end className={link}>{t('board')}</NavLink>
             <NavLink to="/today" className={link}>{t('today')} {status && status.open_alerts > 0 && <span className="tag present ms-1">{status.open_alerts}</span>}</NavLink>
             <NavLink to="/map" className={link}>{t('map')}</NavLink>
+            <NavLink to="/series" className={link}>{t('series')}</NavLink>
             <NavLink to="/positions" className={link}>{t('positions')}</NavLink>
             <NavLink to="/record" className={link}>{t('calibration')}</NavLink>
             {atLeast(me.role, 'analyst') && <NavLink to="/queue" className={link}>{t('queue')} {status && status.pending_verification > 0 && <span className="tag ms-1">{status.pending_verification}</span>}</NavLink>}
@@ -45,7 +46,7 @@ export default function App() {
           </div>
         </div>
         {status && status.synthetic_rows > 0 && (
-          <div className="bg-[var(--accent)]/10 border-t border-[var(--accent)]/40 text-[var(--accent)] text-xs px-4 py-1.5 text-center">{t('demoBanner')}</div>
+          <div className="bg-[var(--accent)]/10 border-t border-[var(--accent)]/40 text-[var(--accent)] text-xs px-4 py-1.5 text-center">{t('demoBanner')} <NavLink to="/sources" className="underline">{status.synthetic_rows}</NavLink></div>
         )}
         {status?.licence && status.licence.mode !== 'licensed' && (
           <div className="bg-[var(--up)]/10 border-t border-[var(--up)]/40 text-[var(--up)] text-xs px-4 py-1.5 text-center">{status.licence.mode === 'grace' ? t('graceBanner') : t('evaluationBanner')}</div>

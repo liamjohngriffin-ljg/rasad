@@ -39,7 +39,7 @@ def _step(name: str, fn) -> None:
 
 def run_once() -> None:
     """The full daily pipeline."""
-    for name, fn in (("poll", pipeline.poll), ("extract", pipeline.extract), ("commit", pipeline.commit), ("digest", pipeline.digest)):
+    for name, fn in (("poll", pipeline.poll), ("extract", pipeline.extract), ("commit", pipeline.commit), ("digest", pipeline.digest), ("backup", pipeline.backup)):
         _step(name, fn)
 
 

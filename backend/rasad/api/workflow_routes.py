@@ -60,7 +60,9 @@ class QuestionIn(BaseModel):
     title_ar: str | None = None
     horizon_days: int = Field(ge=7, le=730)
     resolution_criteria: str = Field(min_length=10)
+    resolution_criteria_ar: str | None = None
     decision_hooks: list[str] = []
+    decision_hooks_ar: list[str] | None = None
     base_rate: float = Field(gt=0.0, lt=1.0)
     base_rate_note: str | None = None
     opened_at: str | None = None
@@ -72,7 +74,9 @@ class QuestionUpdate(BaseModel):
     title_ar: str | None = None
     horizon_days: int | None = Field(default=None, ge=7, le=730)
     resolution_criteria: str | None = None
+    resolution_criteria_ar: str | None = None
     decision_hooks: list[str] | None = None
+    decision_hooks_ar: list[str] | None = None
     base_rate: float | None = Field(default=None, gt=0.0, lt=1.0)
     base_rate_note: str | None = None
     resolves_at: str | None = None
@@ -98,7 +102,7 @@ def _validate_rule(rule: dict) -> None:
 def _question_row(q: Question) -> dict:
     return {
         "code": q.code, "title_en": q.title_en, "title_ar": q.title_ar, "horizon_days": q.horizon_days, "resolution_criteria": q.resolution_criteria,
-        "decision_hooks": q.decision_hooks, "base_rate": q.base_rate, "base_rate_note": q.base_rate_note, "status": q.status,
+        "resolution_criteria_ar": q.resolution_criteria_ar, "decision_hooks": q.decision_hooks, "decision_hooks_ar": q.decision_hooks_ar, "base_rate": q.base_rate, "base_rate_note": q.base_rate_note, "status": q.status,
         "opened_at": q.opened_at.isoformat(), "resolves_at": q.resolves_at.isoformat(), "order": q.order,
         "indicators": [
             {"id": i.id, "code": i.code, "name_en": i.name_en, "name_ar": i.name_ar, "description": i.description, "lr_present": i.lr_present, "lr_absent": i.lr_absent, "polarity": i.polarity, "rule": i.rule}
@@ -125,7 +129,7 @@ def create_question(req: QuestionIn, db: Session = Depends(get_session), user: U
     order = (db.scalar(select(func.max(Question.order))) or 0) + 1
     q = Question(
         code=req.code, title_en=req.title_en, title_ar=req.title_ar, horizon_days=req.horizon_days, resolution_criteria=req.resolution_criteria,
-        decision_hooks=req.decision_hooks, base_rate=req.base_rate, base_rate_note=req.base_rate_note, status="open", opened_at=opened,
+        resolution_criteria_ar=req.resolution_criteria_ar, decision_hooks=req.decision_hooks, decision_hooks_ar=req.decision_hooks_ar, base_rate=req.base_rate, base_rate_note=req.base_rate_note, status="open", opened_at=opened,
         resolves_at=opened + timedelta(days=req.horizon_days), order=order,
     )
     db.add(q)
@@ -443,10 +447,11 @@ class SeriesPointIn(BaseModel):
 def add_series_point(req: SeriesPointIn, db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))) -> dict:
     d = date.fromisoformat(req.date)
     p = db.scalar(select(SeriesPoint).where(SeriesPoint.series == req.series, SeriesPoint.date == d))
+    src = f"{req.source} (entered by {user.username})"[:120]
     if p:
-        p.value, p.unit, p.source, p.is_synthetic = req.value, req.unit, f"{req.source} (entered by {user.username})", False
+        p.value, p.unit, p.source, p.is_synthetic = req.value, req.unit, src, False
     else:
-        p = SeriesPoint(series=req.series, date=d, value=req.value, unit=req.unit, source=f"{req.source} (entered by {user.username})", is_synthetic=False)
+        p = SeriesPoint(series=req.series, date=d, value=req.value, unit=req.unit, source=src, is_synthetic=False)
         db.add(p)
     db.commit()
     auth.audit(db, user, "series_point_entered", req.series, {"date": req.date, "value": req.value})
