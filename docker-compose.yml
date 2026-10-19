@@ -53,7 +53,7 @@ services:
     image: caddy:2-alpine
     restart: unless-stopped
     environment:
-      DOMAIN: ${DOMAIN:-}
+      DOMAIN: ${DOMAIN:-:80}  # blank means plain HTTP on port 80 (Caddy needs an address, not an empty string)
     ports:
       - "80:80"
       - "443:443"

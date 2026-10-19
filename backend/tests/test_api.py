@@ -188,3 +188,31 @@ def test_guide_in_both_languages(client):
     ar = client.get("/api/guide?lang=ar").json()
     assert en["content_md"].startswith("# Analyst guide") and ar["lang"] == "ar" and "دليل المحلل" in ar["content_md"]
     assert "—" not in en["content_md"] and "–" not in en["content_md"]
+
+
+def test_static_shell_is_safe(tmp_path, monkeypatch):
+    """The front-end fallback serves files only from the static folder, answers HEAD, and leaves /api/ 404s alone."""
+    import importlib
+
+    from fastapi.testclient import TestClient
+
+    (tmp_path / "index.html").write_text("<html>shell</html>")
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "favicon.svg").write_text("<svg/>")
+    (tmp_path.parent / "secret.txt").write_text("do not serve")
+    monkeypatch.setenv("RASAD_STATIC_DIR", str(tmp_path))
+    import rasad.api.app as appmod
+
+    mod = importlib.reload(appmod)
+    try:
+        c = TestClient(mod.app)
+        assert c.get("/").text == "<html>shell</html>"
+        assert c.head("/").status_code == 200
+        assert c.get("/favicon.svg").text == "<svg/>"
+        assert c.get("/board/anything").text == "<html>shell</html>"
+        for probe in ("/..%2Fsecret.txt", "/%2e%2e/secret.txt", "/assets/../../secret.txt"):
+            assert "do not serve" not in c.get(probe).text
+        assert c.get("/api/no-such-thing").status_code == 404
+    finally:
+        monkeypatch.delenv("RASAD_STATIC_DIR")
+        importlib.reload(appmod)

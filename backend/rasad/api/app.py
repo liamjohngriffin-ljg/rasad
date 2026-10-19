@@ -539,9 +539,14 @@ if os.path.isdir(_static):  # pragma: no cover
     if os.path.isdir(os.path.join(_static, "assets")):
         app.mount("/assets", StaticFiles(directory=os.path.join(_static, "assets")), name="assets")
 
-    @app.get("/{full_path:path}", include_in_schema=False)
+    _static_root = os.path.realpath(_static)
+
+    @app.api_route("/{full_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
     def spa(full_path: str):
-        candidate = os.path.join(_static, full_path)
-        if full_path and os.path.isfile(candidate):
+        if full_path == "api" or full_path.startswith("api/"):
+            raise HTTPException(404, "no such endpoint")
+        candidate = os.path.realpath(os.path.join(_static_root, full_path))
+        # only files inside the static folder are served; "../" or an encoded form of it gets the app shell
+        if full_path and candidate.startswith(_static_root + os.sep) and os.path.isfile(candidate):
             return FileResponse(candidate)
-        return FileResponse(os.path.join(_static, "index.html"))
+        return FileResponse(os.path.join(_static_root, "index.html"), headers={"Cache-Control": "no-cache"})

@@ -10,5 +10,8 @@
 		Referrer-Policy no-referrer
 		-Server
 	}
+	# defence in depth: the API already refuses paths outside its folders; nothing legitimate uses ".."
+	@traversal expression `{http.request.uri.path}.matches("(?i)(\\.\\.|%2e)")`
+	respond @traversal 400
 	reverse_proxy api:8000
 }
