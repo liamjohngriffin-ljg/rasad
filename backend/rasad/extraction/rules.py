@@ -12,8 +12,8 @@ from .schema import ExtractedEvent, ExtractedObservation, ExtractionResult
 EVENT_LEXICON = [
     # (event_type, severity, patterns in en / ar / fa)
     ("missile_strike", 4, [r"\bmissile (strike|attack)s?\b", r"\bballistic missile", r"صاروخ", r"صواريخ", r"موشک"]),
-    ("drone_strike", 3, [r"\bdrone (strike|attack)s?\b", r"\buav\b", r"مسيّرة", r"مسيرة", r"طائرات مسيرة", r"پهپاد"]),
-    ("intercept", 2, [r"\bintercept(ed|ion)\b", r"اعتراض", r"اعترضت", r"رهگیری"]),
+    ("drone_strike", 3, [r"\bdrone (strike|attack)s?\b", r"\buav\b", r"مسيّر", r"طائر\w*\s+مسير", r"\bمسيرات\b", r"مسيرتين", r"پهپاد"]),  # bare مسيرة is also "a march" or "a path"
+    ("intercept", 2, [r"\bintercept(ed|ion|ing|s)?\b", r"اعتراض\s+و\s*?تدمير", r"اعتراض\s+(صاروخ|طائر|مسير|قذيف)", r"اعترضت", r"رهگیری"]),  # bare اعتراض is also "an objection"
     ("maritime_attack", 4, [r"\b(tanker|vessel|ship)[^.]{0,60}(attack|struck|hit|explosion)", r"هجوم على (ناقلة|سفينة)", r"استهداف (ناقلة|سفينة)", r"حمله به (نفتکش|کشتی)"]),
     ("seizure", 4, [r"\b(seized|seizure|detained)[^.]{0,40}(tanker|vessel|ship)", r"احتجاز (ناقلة|سفينة)", r"توقیف (نفتکش|کشتی)"]),
     ("cyber_incident", 3, [r"\bcyber ?attack\b", r"\bransomware\b", r"هجوم سيبراني", r"حمله سایبری"]),
@@ -25,18 +25,25 @@ EVENT_LEXICON = [
 ]
 
 COUNTRY_LEXICON = {
-    "SA": [r"saudi", r"riyadh", r"السعودية", r"الرياض", r"عربستان"],
-    "AE": [r"\buae\b", r"emirates", r"abu dhabi", r"dubai", r"الإمارات", r"أبوظبي", r"دبي", r"امارات"],
-    "QA": [r"qatar", r"doha", r"قطر", r"الدوحة"],
+    # first match wins: Gulf states, then the waterways, then the wider region (a Hormuz report that
+    # names Iran's navy is a Hormuz event). Cities, ports and energy sites are listed so a strike on
+    # Jizan or Ras Laffan is placed even when the country is not named.
+    "SA": [r"saudi", r"riyadh", r"jeddah", r"ji[sz]an\b", r"jazan", r"\babha\b", r"khamis mushait", r"najran", r"dammam", r"dhahran", r"ras tanura",
+           r"abqaiq", r"yanbu", r"eastern province", r"السعودية", r"الرياض", r"جدة", r"جازان", r"جيزان", r"أبها", r"خميس مشيط", r"نجران", r"الدمام",
+           r"الظهران", r"رأس تنورة", r"بقيق", r"ينبع", r"المنطقة الشرقية", r"عربستان"],
+    "AE": [r"\buae\b", r"emirates", r"abu dhabi", r"dubai", r"sharjah", r"fujairah", r"ras al[- ]khaimah", r"ruwais", r"jebel ali", r"khor ?fakkan",
+           r"الإمارات", r"أبوظبي", r"دبي", r"الشارقة", r"الفجيرة", r"رأس الخيمة", r"الرويس", r"جبل علي", r"خورفكان", r"امارات"],
+    "QA": [r"qatar", r"doha", r"ras laffan", r"mesaieed", r"قطر", r"الدوحة", r"رأس لفان", r"مسيعيد"],
     "KW": [r"kuwait", r"الكويت", r"کویت"],
     "BH": [r"bahrain", r"manama", r"البحرين", r"المنامة", r"بحرین"],
-    "OM": [r"\boman\b", r"muscat", r"عمان", r"مسقط"],
-    "IR": [r"\biran", r"tehran", r"إيران", r"طهران", r"ایران", r"تهران"],
-    "IQ": [r"\biraq", r"baghdad", r"العراق", r"بغداد", r"عراق"],
-    "YE": [r"yemen", r"sanaa", r"hodeidah", r"اليمن", r"صنعاء", r"الحديدة", r"یمن"],
-    "IL": [r"israel", r"tel aviv", r"إسرائيل", r"اسرائیل"],
+    "OM": [r"\boman\b", r"muscat", r"duqm", r"salalah", r"sohar", r"khasab", r"musandam", r"مسقط", r"الدقم", r"صلالة", r"صحار", r"خصب", r"مسندم", r"سلطنة عمان"],
     "HORMUZ": [r"hormuz", r"هرمز"],
     "RED_SEA": [r"red sea", r"bab[- ]?(al|el)[- ]?mand", r"البحر الأحمر", r"باب المندب", r"دریای سرخ"],
+    "GULF_OF_ADEN": [r"gulf of aden", r"خليج عدن"],
+    "IR": [r"\biran", r"tehran", r"bandar abbas", r"إيران", r"طهران", r"بندر عباس", r"ایران", r"تهران"],
+    "IQ": [r"\biraq", r"baghdad", r"basra", r"erbil", r"العراق", r"بغداد", r"البصرة", r"أربيل", r"عراق"],
+    "YE": [r"yemen", r"sanaa", r"hodeidah", r"\baden\b", r"marib", r"اليمن", r"صنعاء", r"الحديدة", r"عدن", r"مأرب", r"یمن"],
+    "IL": [r"israel", r"tel aviv", r"eilat", r"إسرائيل", r"إيلات", r"اسرائیل"],
 }
 
 ACTOR_LEXICON = {
@@ -105,7 +112,12 @@ def _first(lexicon: dict[str, list[str]], text: str) -> str | None:
 def extract(text: str, published: date, language: str = "en", default_actor: str | None = None) -> ExtractionResult:
     text_norm = " ".join(text.split())
     events: list[ExtractedEvent] = []
-    for etype, sev, patterns in EVENT_LEXICON:
+    order = EVENT_LEXICON
+    # "drones intercepted over Riyadh": when the headline is about an interception, the drone or
+    # missile was stopped, so the row is an intercept rather than a strike
+    if _any(next(p for t, _, p in EVENT_LEXICON if t == "intercept"), text_norm[:160]):
+        order = sorted(EVENT_LEXICON, key=lambda x: x[0] != "intercept")
+    for etype, sev, patterns in order:
         if _any(patterns, text_norm):
             country = _first(COUNTRY_LEXICON, text_norm)
             actor = _first(ACTOR_LEXICON, text_norm)
