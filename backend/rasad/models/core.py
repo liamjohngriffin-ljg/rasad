@@ -115,7 +115,7 @@ class ThreatEvent(Base):
     # gnss_interference, mine_warning, cyber_incident, airspace_closure, insurer_listing,
     # expulsion, deployment, exercise, statement_threat
     location_name: Mapped[str | None] = mapped_column(String(200))
-    country: Mapped[str | None] = mapped_column(String(8))
+    country: Mapped[str | None] = mapped_column(String(16))
     lat: Mapped[float | None] = mapped_column(Float)
     lon: Mapped[float | None] = mapped_column(Float)
     actor_id: Mapped[int | None] = mapped_column(ForeignKey("actors.id"))

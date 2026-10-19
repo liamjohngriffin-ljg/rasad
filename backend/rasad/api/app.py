@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from .. import __version__
@@ -253,7 +253,7 @@ def sources(db: Session = Depends(get_session), user: User = Depends(current_use
 def series_index(db: Session = Depends(get_session), user: User = Depends(current_user)) -> list[dict]:
     """Every series with its span, point count and how much of it is synthetic: the data freshness view."""
     rows = db.execute(
-        select(SeriesPoint.series, func.count(SeriesPoint.id), func.min(SeriesPoint.date), func.max(SeriesPoint.date), func.sum(SeriesPoint.is_synthetic), func.max(SeriesPoint.unit))
+        select(SeriesPoint.series, func.count(SeriesPoint.id), func.min(SeriesPoint.date), func.max(SeriesPoint.date), func.sum(case((SeriesPoint.is_synthetic.is_(True), 1), else_=0)), func.max(SeriesPoint.unit))
         .group_by(SeriesPoint.series).order_by(SeriesPoint.series)
     ).all()
     out = []

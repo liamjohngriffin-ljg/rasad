@@ -32,7 +32,8 @@ AS_OF = date(2026, 10, 18)
 @pytest.fixture(scope="session")
 def seeded_db_url(tmp_path_factory):
     path = tmp_path_factory.mktemp("db") / "test.db"
-    url = f"sqlite:///{path}"
+    # RASAD_TEST_DATABASE_URL=postgresql+psycopg://... runs the whole suite against PostgreSQL
+    url = os.getenv("RASAD_TEST_DATABASE_URL") or f"sqlite:///{path}"
     reset_engine_for_tests(url)
     seed_load.seed(AS_OF, history_days=10)
     return url

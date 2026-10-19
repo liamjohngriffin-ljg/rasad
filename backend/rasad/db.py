@@ -68,12 +68,17 @@ def _add_missing_columns(engine) -> None:
         for table in Base.metadata.sorted_tables:
             if not insp.has_table(table.name):
                 continue
-            have = {c["name"] for c in insp.get_columns(table.name)}
+            existing = {c["name"]: c for c in insp.get_columns(table.name)}
             for col in table.columns:
-                if col.name in have:
+                if col.name not in existing:
+                    ctype = col.type.compile(dialect=engine.dialect)
+                    conn.execute(text(f'ALTER TABLE {table.name} ADD COLUMN "{col.name}" {ctype}'))
                     continue
-                ctype = col.type.compile(dialect=engine.dialect)
-                conn.execute(text(f'ALTER TABLE {table.name} ADD COLUMN "{col.name}" {ctype}'))
+                # widened string columns (PostgreSQL enforces lengths; SQLite ignores them)
+                want = getattr(col.type, "length", None)
+                have_len = getattr(existing[col.name]["type"], "length", None)
+                if engine.dialect.name == "postgresql" and want and have_len and have_len < want:
+                    conn.execute(text(f'ALTER TABLE {table.name} ALTER COLUMN "{col.name}" TYPE VARCHAR({want})'))
 
 
 def reset_engine_for_tests(url: str) -> None:

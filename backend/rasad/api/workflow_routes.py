@@ -443,10 +443,11 @@ class SeriesPointIn(BaseModel):
 def add_series_point(req: SeriesPointIn, db: Session = Depends(get_session), user: User = Depends(require_role("analyst"))) -> dict:
     d = date.fromisoformat(req.date)
     p = db.scalar(select(SeriesPoint).where(SeriesPoint.series == req.series, SeriesPoint.date == d))
+    src = f"{req.source} (entered by {user.username})"[:120]
     if p:
-        p.value, p.unit, p.source, p.is_synthetic = req.value, req.unit, f"{req.source} (entered by {user.username})", False
+        p.value, p.unit, p.source, p.is_synthetic = req.value, req.unit, src, False
     else:
-        p = SeriesPoint(series=req.series, date=d, value=req.value, unit=req.unit, source=f"{req.source} (entered by {user.username})", is_synthetic=False)
+        p = SeriesPoint(series=req.series, date=d, value=req.value, unit=req.unit, source=src, is_synthetic=False)
         db.add(p)
     db.commit()
     auth.audit(db, user, "series_point_entered", req.series, {"date": req.date, "value": req.value})
