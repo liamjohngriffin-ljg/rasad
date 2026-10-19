@@ -19,7 +19,7 @@ from ..briefs import generate as briefs
 from ..db import get_session
 from ..engine import alerts as alert_engine
 from ..models import Alert, Document, Forecast, PolicyObservation, Question, Source, ThreatEvent
-from .deps import current_user, require_role
+from .deps import check_language, current_user, require_role
 
 router = APIRouter(prefix="/api", tags=["daily"])
 
@@ -264,6 +264,7 @@ def markdown_to_docx(md: str, *, lang: str, marking: str, title_fallback: str) -
 def guide(lang: str = Query("en", pattern="^(en|ar)$"), user: User = Depends(current_user)) -> dict:
     """The analyst guide shipped with this version (Arabic falls back to English until translated)."""
     base = os.path.join(os.path.dirname(os.path.dirname(__file__)), "docs")
+    check_language(lang)
     path = os.path.join(base, f"guide_{lang}.md")
     if not os.path.exists(path):
         path, lang = os.path.join(base, "guide_en.md"), "en"
@@ -273,6 +274,7 @@ def guide(lang: str = Query("en", pattern="^(en|ar)$"), user: User = Depends(cur
 
 @router.get("/briefs/weekly")
 def weekly_brief(lang: str = Query("en", pattern="^(en|ar)$"), as_of: str | None = None, days: int = 7, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+    check_language(lang)
     from ..briefs import weekly
 
     d = date.fromisoformat(as_of) if as_of else date.today()
@@ -283,6 +285,7 @@ def weekly_brief(lang: str = Query("en", pattern="^(en|ar)$"), as_of: str | None
 
 @router.get("/briefs/weekly/docx")
 def weekly_brief_docx(lang: str = Query("en", pattern="^(en|ar)$"), as_of: str | None = None, days: int = 7, db: Session = Depends(get_session), user: User = Depends(current_user)):
+    check_language(lang)
     from ..briefs import weekly
 
     d = date.fromisoformat(as_of) if as_of else date.today()
@@ -295,6 +298,7 @@ def weekly_brief_docx(lang: str = Query("en", pattern="^(en|ar)$"), as_of: str |
 
 @router.get("/briefs/{code}/docx")
 def brief_docx(code: str, lang: str = Query("en", pattern="^(en|ar)$"), as_of: str | None = None, polish: bool = True, db: Session = Depends(get_session), user: User = Depends(current_user)):
+    check_language(lang)
     d = date.fromisoformat(as_of) if as_of else date.today()
     try:
         b = briefs.generate(db, code, d, lang, polish=polish)

@@ -40,7 +40,7 @@ from ..models import (
 from ..policy import book as policy_book
 from . import admin_routes, auth_routes, daily_routes, workflow_routes
 from .. import licence
-from .deps import client_ip, current_user, require_role
+from .deps import check_language, client_ip, current_user, require_role
 
 app = FastAPI(title="Rasad API", version=__version__)
 _dev_origins = [o.strip() for o in os.getenv("RASAD_CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()]
@@ -379,6 +379,7 @@ def commit_forecasts(req: CommitRequest, db: Session = Depends(get_session), use
 
 @app.get("/api/briefs/{code}")
 def brief(code: str, lang: str = Query("en", pattern="^(en|ar)$"), as_of: str | None = None, polish: bool = True, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
+    check_language(lang)
     try:
         b = briefs.generate(db, code, _as_of(as_of), lang, polish=polish)
     except KeyError:

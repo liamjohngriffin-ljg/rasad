@@ -197,3 +197,15 @@ def test_licence_modules_are_enforced(admin_client, monkeypatch):
         assert bearer.get("/api/board").status_code == 401
     finally:
         monkeypatch.setattr(licence, "_cached", full)
+
+
+def test_arabic_is_a_licensed_module(client, monkeypatch):
+    from rasad import licence
+
+    full = licence.current()
+    monkeypatch.setattr(licence, "_cached", licence.LicenceState("licensed", licensee="English only", seats=50, features=["core"]))
+    try:
+        assert client.get("/api/briefs/hormuz_closure_90?lang=ar").status_code == 403
+        assert client.get("/api/briefs/hormuz_closure_90?lang=en").status_code == 200
+    finally:
+        monkeypatch.setattr(licence, "_cached", full)

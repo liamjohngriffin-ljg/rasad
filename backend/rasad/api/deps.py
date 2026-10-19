@@ -85,6 +85,14 @@ def require_feature(feature: str):
     return dep
 
 
+def check_language(lang: str) -> None:
+    """Arabic output is a licensed module."""
+    from .. import licence
+
+    if lang == "ar" and not licence.current().has("arabic"):
+        raise HTTPException(403, "not in your licence: arabic (Arabic interface and briefs)")
+
+
 def require_role(*roles: str):
     order = {"viewer": 0, "analyst": 1, "admin": 2}
     minimum = min(order[r] for r in roles)

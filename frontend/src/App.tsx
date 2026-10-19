@@ -13,6 +13,8 @@ export default function App() {
   useEffect(() => { if (me) api.status().then(setStatus).catch(() => setStatus(null)) }, [me])
   useEffect(() => { if (me) api.settings().then((s) => { if (s.accent && /^#[0-9a-fA-F]{6}$/.test(s.accent)) document.documentElement.style.setProperty('--accent', s.accent); if (s.logo_data_url) setLogo(s.logo_data_url) }).catch(() => {}) }, [me])
   const [logo, setLogo] = useState<string | null>(null)
+  const arabicOk = !status?.licence || status.licence.features.includes('arabic')
+  useEffect(() => { if (!arabicOk && lang === 'ar') setLang('en') }, [arabicOk, lang, setLang])
   if (loading) return <div className="min-h-full flex items-center justify-center muted">…</div>
   if (!me) return <Login />
   if ((me.must_change_password || me.must_enrol_mfa) && location.pathname !== '/account') return <Navigate to="/account" replace />
@@ -42,7 +44,7 @@ export default function App() {
             {status?.last_commit && <span className="muted whitespace-nowrap hidden lg:inline">{t('asOf')} <span className="mono">{status.last_commit}</span></span>}
             <NavLink to="/guide" className="muted hover:text-[var(--ink)]" title={t('guide')}>?</NavLink>
             <NavLink to="/account" className="muted hover:text-[var(--ink)]">{me.display_name}</NavLink>
-            <button className="btn" onClick={() => setLang(lang === 'en' ? 'ar' : 'en')}>{t('lang')}</button>
+            {arabicOk && <button className="btn" onClick={() => setLang(lang === 'en' ? 'ar' : 'en')}>{t('lang')}</button>}
             <button className="btn" onClick={logout}>{t('signOut')}</button>
           </div>
         </div>
