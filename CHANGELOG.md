@@ -7,6 +7,7 @@ Analytical integrity
 - UKMTO updates no longer repeat the original narrative; stored rows and the shipped snapshot repaired on upgrade.
 
 Security
+- Independent security review (19 October) and fixes: a path traversal in the front-end fallback that could read files without signing in; a sign-in throttle that could be sidestepped by adding a space to the username (and with it, unlimited second-factor guesses); a licence key override in the environment that let anyone sign their own licence; feed redirects that could reach internal addresses; sign-out that left the old cookie valid; seat limits bypassed by reactivating users; CSV exports that could carry spreadsheet formulas; and smaller items (constant-time unknown users, forced password change on the server, bounded parameters, API docs off, attribution on tasking, a CSP and request cap, owner-only secret and backup files, unprivileged containers, no plain-HTTP exposure without a domain). Each has a regression test.
 - Two-factor sign-in with any authenticator app (RFC 6238), QR enrolment, eight single-use recovery codes, replay protection.
 - Organisation policy to require two-factor sign-in, enforced by the server: without a second factor a user reaches only the Account page.
 - Sessions end on password change, admin reset or deactivation; "sign out everywhere else" on the Account page; administrators can reset a lost second factor.
@@ -17,6 +18,10 @@ Analysts
 - Verification queue grouped by incident with publisher badges.
 
 Operations
+- Container stack verified end to end (build, seed, live pipeline, upgrade, every page under the CSP) and a tested restore script with a safety dump.
+- Licence modules enforced by the server: Arabic, export, API and team channel, model-assisted extraction.
+- Alerts to a Teams or Slack channel; the day's record chain head is posted there and in the email digest as an external witness.
+- Wire extraction: Gulf geography required for events, syndicated copies folded, bilingual wire stories paired, Arabic drone and interception terms disambiguated.
 - Whole suite runs against PostgreSQL 16 (RASAD_TEST_DATABASE_URL); live pipeline verified on PostgreSQL.
 - `python -m rasad.doctor` readiness report; `run link` upgrade step (the Windows launcher runs it on every start); SQLite online backups in the daily pipeline.
 

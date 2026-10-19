@@ -95,7 +95,15 @@ docker compose exec api python -m rasad.auth.cli password liam
 sudo bash deploy/update.sh                          # deploy a new version (data and .env untouched)
 ```
 
-Restore from a backup: `zcat backups/rasad-YYYYMMDD-HHMM.sql.gz | docker compose exec -T db psql -U rasad rasad` into a fresh database.
+Restore from a backup: `sudo bash deploy/restore.sh` (newest dump) or `sudo bash deploy/restore.sh rasad-YYYYMMDD-HHMM.sql.gz`. It takes a safety dump of the current database first, stops the API and scheduler, replaces the database and starts them again; then `docker compose exec api python -m rasad.doctor` confirms the record chain. Rehearsed on 19 October 2026: 13 seconds for a database with a 322-link chain.
+
+Security notes for the operator:
+
+- Without a domain, `install.sh` binds the web ports to the server itself (`RASAD_BIND=127.0.0.1`), because Docker's published ports bypass host firewalls; reach it through an SSH tunnel. With a domain, Caddy serves TLS with HSTS, a Content-Security-Policy, a 2 MB request limit and refuses path traversal.
+- The containers run as an unprivileged user (uid 10001). `deploy/update.sh` hands an existing data volume to that user on the first upgrade to 0.4.0.
+- The API trusts `X-Forwarded-For` only with `RASAD_TRUST_PROXY=true` (set in the compose file, where only Caddy can reach the API). Do not set it on a host where the API port is reachable directly.
+- Interactive API documentation is off; set `RASAD_API_DOCS=true` to expose it at `/api/docs` for integrators.
+- Backup dumps are readable by their owner only.
 
 Connector URLs for PDFs (UKMTO advisories, JWC circulars, JMIC dashboards) and the PortWatch export go in `urls.yaml` in the data volume (`docker compose exec api sh -c 'cat > /data/urls.yaml'`); see `backend/rasad/pipelines/run.py` for the keys. Connectors refuse any host not on `RASAD_EGRESS_ALLOWLIST`.
 

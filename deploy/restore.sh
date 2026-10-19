@@ -4,6 +4,7 @@
 #   sudo bash deploy/restore.sh                      # newest backup
 #   sudo bash deploy/restore.sh rasad-20261019-0602.sql.gz
 set -euo pipefail
+umask 077
 APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$APP_DIR"
 file="${1:-}"
@@ -16,7 +17,7 @@ docker compose exec -T backup test -f "/backups/$file" || { echo "/backups/$file
 echo "== Restoring $file"
 stamp=$(date +%Y%m%d-%H%M%S)
 echo "== Safety dump of the current database: pre-restore-$stamp.sql.gz"
-docker compose exec -T backup sh -c "pg_dump -h db -U rasad rasad | gzip > /backups/pre-restore-$stamp.sql.gz"
+docker compose exec -T backup sh -c "umask 077; pg_dump -h db -U rasad rasad | gzip > /backups/pre-restore-$stamp.sql.gz"
 docker compose stop api scheduler
 docker compose exec -T backup sh -c "psql -h db -U rasad -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS rasad WITH (FORCE)' -c 'CREATE DATABASE rasad OWNER rasad'"
 docker compose exec -T backup sh -c "gunzip -c /backups/$file | psql -h db -U rasad -d rasad -v ON_ERROR_STOP=1 -q"
