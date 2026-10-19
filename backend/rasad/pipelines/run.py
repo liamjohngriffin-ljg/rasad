@@ -123,7 +123,8 @@ def commit(as_of: date | None = None) -> dict:
         out = engine_run.commit_all_open(db, as_of or date.today())
         raised = alert_engine.after_commit(db, out)
         pushed = notify.push_new(db)
-        return {"alerts": raised, "chat": pushed, **{f.question.code: f.final_prob for f in out}}
+        anchor = notify.post_anchor(db, as_of or date.today(), len(out), out[-1].commit_hash if out else None) if out else {"anchored": False}
+        return {"alerts": raised, "chat": pushed, "anchor": anchor, **{f.question.code: f.final_prob for f in out}}
     finally:
         db.close()
 

@@ -129,6 +129,38 @@ def push_new(db: Session) -> dict:
     return {"pushed": len(send), "kind": kind}
 
 
+def post_anchor(db: Session, as_of, n_forecasts: int, head_hash: str | None) -> dict:
+    """The day's chain head, posted outside the database. A copy held in the channel's history is
+    what makes the record tamper-evident: rewriting the table would no longer match it."""
+    url = _setting(db, "webhook_url")
+    if not url or not head_hash:
+        return {"anchored": False}
+    from .. import licence
+
+    if not licence.current().has("api"):
+        return {"anchored": False}
+    kind = _setting(db, "webhook_kind") or "teams"
+    marking = _setting(db, "marking") or "OFFICIAL"
+    product = _setting(db, "product_name") or "Rasad"
+    text = f"{product} record for {as_of}: {n_forecasts} forecasts committed. Chain head {head_hash}"
+    if kind == "teams":
+        payload = {"type": "message", "attachments": [{"contentType": "application/vnd.microsoft.card.adaptive", "contentUrl": None, "content": {
+            "$schema": "http://adaptivecards.io/schemas/adaptive-card.json", "type": "AdaptiveCard", "version": "1.4", "body": [
+                {"type": "TextBlock", "text": marking, "size": "Small", "weight": "Bolder", "color": "Attention"},
+                {"type": "TextBlock", "text": f"{product} record for {as_of}: {n_forecasts} forecasts committed", "wrap": True},
+                {"type": "TextBlock", "text": f"Chain head {head_hash}", "fontType": "Monospace", "size": "Small", "wrap": True},
+            ]}}]}
+    elif kind == "slack":
+        payload = {"text": f"[{marking}] {text}"}
+    else:
+        payload = {"product": product, "marking": marking, "anchor": {"as_of": str(as_of), "forecasts": n_forecasts, "chain_head": head_hash}, "text": text}
+    try:
+        _post(url, payload)
+    except Exception as exc:  # noqa: BLE001
+        return {"anchored": False, "error": f"{type(exc).__name__}: {exc}"[:200]}
+    return {"anchored": True, "head": head_hash[:16]}
+
+
 def send_test(db: Session) -> dict:
     url = _setting(db, "webhook_url")
     if not url:

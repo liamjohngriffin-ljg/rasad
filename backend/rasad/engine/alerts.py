@@ -133,6 +133,9 @@ def send_digest(db: Session) -> dict:
         return {"sent": False, "reason": "nothing unacknowledged"}
     base = os.getenv("RASAD_PUBLIC_URL", "").rstrip("/")
     lines = [f"Rasad digest, {datetime.utcnow():%Y-%m-%d %H:%M} UTC: {len(alerts)} unacknowledged alerts", ""]
+    head = db.scalar(select(Forecast).order_by(Forecast.id.desc()).limit(1))
+    if head is not None:
+        lines += [f"Record chain head ({head.as_of}): {head.commit_hash}", "Keep this message: it is an independent copy of the record's state.", ""]
     for a in alerts:
         link = f" {base}/q/{a.question_code}" if base and a.question_code else ""
         lines.append(f"[{'!' * a.severity}] {a.created_at:%Y-%m-%d} {a.kind}: {a.title_en}{link}")
