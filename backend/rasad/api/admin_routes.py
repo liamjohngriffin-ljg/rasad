@@ -30,6 +30,8 @@ SETTING_KEYS = {
     "org_name": "", "product_name": "Rasad", "marking": os.getenv("RASAD_MARKING", "OFFICIAL"), "default_lang": "en", "accent": "#d9a441",
     "logo_data_url": "", "footer_note": "", "public_url": os.getenv("RASAD_PUBLIC_URL", ""), "digest_to": os.getenv("RASAD_DIGEST_TO", ""),
     "require_mfa": os.getenv("RASAD_REQUIRE_MFA", "false"),
+    "webhook_url": os.getenv("RASAD_WEBHOOK_URL", ""), "webhook_kind": os.getenv("RASAD_WEBHOOK_KIND", "teams"),
+    "webhook_min_severity": os.getenv("RASAD_WEBHOOK_MIN_SEVERITY", "2"),
 }
 
 
@@ -128,9 +130,22 @@ def revoke_key(key_id: int, db: Session = Depends(get_session), admin: User = De
 # ---------------------------------------------------------------------------
 
 
+# settings that carry a credential: never shown to non-admins, shown masked to admins
+SECRET_SETTINGS = {"webhook_url"}
+MASK = "••••"
+
+
+def _public_settings(db: Session, user: User) -> dict:
+    out = all_settings(db)
+    for k in SECRET_SETTINGS:
+        v = out.get(k) or ""
+        out[k] = (MASK + v[-6:] if v else "") if user.role == "admin" else ""
+    return out
+
+
 @router.get("/settings")
 def read_settings(db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
-    return all_settings(db)
+    return _public_settings(db, user)
 
 
 class SettingsIn(BaseModel):
@@ -145,6 +160,15 @@ def write_settings(req: SettingsIn, db: Session = Depends(get_session), admin: U
             raise HTTPException(400, f"unknown setting {k}")
         if k == "logo_data_url" and len(v) > 200_000:
             raise HTTPException(400, "logo too large (200 KB limit)")
+        if k in SECRET_SETTINGS and v.startswith(MASK):
+            continue  # the masked value came back unchanged from the form
+        if k == "webhook_url" and v:
+            from ..engine import notify
+
+            try:
+                notify.check_url(v)
+            except ValueError as exc:
+                raise HTTPException(400, str(exc))
         row = db.get(Setting, k)
         if row is None:
             db.add(Setting(key=k, value={"v": v}, updated_by=admin.username))
@@ -153,7 +177,18 @@ def write_settings(req: SettingsIn, db: Session = Depends(get_session), admin: U
         changed.append(k)
     db.commit()
     auth.audit(db, admin, "settings_updated", None, {"keys": changed})
-    return all_settings(db)
+    return _public_settings(db, admin)
+
+
+@router.post("/settings/webhook/test")
+def test_webhook(db: Session = Depends(get_session), admin: User = Depends(require_role("admin"))) -> dict:
+    from ..engine import notify
+
+    res = notify.send_test(db)
+    auth.audit(db, admin, "webhook_tested", None, {"ok": res.get("ok")})
+    if not res.get("ok"):
+        raise HTTPException(400, res.get("error", "webhook failed"))
+    return res
 
 
 # ---------------------------------------------------------------------------

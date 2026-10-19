@@ -26,7 +26,7 @@ import yaml
 from ..config import get_settings
 from ..db import init_db, session_factory
 from ..engine import alerts as alert_engine
-from ..engine import incidents
+from ..engine import incidents, notify
 from ..engine import run as engine_run
 from ..extraction import service as extraction
 from .connectors import gdelt, jmic, jwc, mscio, portwatch, rss_wires, sanctions, state_fms, uk_sanctions, ukmto
@@ -99,6 +99,7 @@ def poll(*, backfill: bool = False) -> dict:
         _try(report, "ukmto_tidy", lambda: ukmto.tidy_descriptions(db))
         _try(report, "incidents", lambda: incidents.link(db))
         _try(report, "alerts", lambda: alert_engine.after_poll(db))
+        _try(report, "chat", lambda: notify.push_new(db))
     finally:
         db.close()
     return report
@@ -121,7 +122,8 @@ def commit(as_of: date | None = None) -> dict:
     try:
         out = engine_run.commit_all_open(db, as_of or date.today())
         raised = alert_engine.after_commit(db, out)
-        return {"alerts": raised, **{f.question.code: f.final_prob for f in out}}
+        pushed = notify.push_new(db)
+        return {"alerts": raised, "chat": pushed, **{f.question.code: f.final_prob for f in out}}
     finally:
         db.close()
 

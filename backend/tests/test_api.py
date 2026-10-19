@@ -216,3 +216,33 @@ def test_static_shell_is_safe(tmp_path, monkeypatch):
     finally:
         monkeypatch.delenv("RASAD_STATIC_DIR")
         importlib.reload(appmod)
+
+
+def test_chat_webhook_settings_and_push(admin_client, client, db, monkeypatch):
+    from datetime import datetime
+
+    from rasad.engine import notify
+    from rasad.models import Alert
+
+    # only https, never an internal address
+    assert admin_client.put("/api/settings", json={"values": {"webhook_url": "http://example.org/hook"}}).status_code == 400
+    assert admin_client.put("/api/settings", json={"values": {"webhook_url": "https://127.0.0.1/hook"}}).status_code == 400
+    monkeypatch.setattr(notify, "check_url", lambda url: None)
+    url = "https://prod-00.westeurope.logic.azure.com/workflows/abc/triggers/manual/paths/invoke?sig=SECRET123456"
+    r = admin_client.put("/api/settings", json={"values": {"webhook_url": url, "webhook_kind": "teams"}})
+    assert r.status_code == 200 and r.json()["webhook_url"].startswith("••••") and "SECRET" not in r.json()["webhook_url"][:-6]
+    assert client.get("/api/settings").json()["webhook_url"] == ""  # analysts never see it
+    # saving the form with the masked value leaves the stored URL alone
+    admin_client.put("/api/settings", json={"values": {"webhook_url": r.json()["webhook_url"]}})
+
+    sent = []
+    monkeypatch.setattr(notify, "_post", lambda u, payload: sent.append((u, payload)))
+    db.add(Alert(kind="severe_event", severity=3, dedupe_key=f"test-push-{datetime.utcnow().timestamp()}", title_en="Tanker struck 17NM east of Zirku", title_ar="استهداف ناقلة", detail={}))
+    db.commit()
+    res = notify.push_new(db)
+    assert res["pushed"] >= 1 and sent[0][0] == url
+    card = sent[0][1]["attachments"][0]["content"]
+    assert card["type"] == "AdaptiveCard" and any("Zirku" in str(b) for b in card["body"])
+    assert notify.push_new(db)["pushed"] == 0  # once only
+    assert admin_client.post("/api/settings/webhook/test").status_code == 200
+    admin_client.put("/api/settings", json={"values": {"webhook_url": ""}})

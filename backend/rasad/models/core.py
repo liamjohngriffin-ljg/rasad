@@ -352,3 +352,4 @@ class Alert(Base):
     dedupe_key: Mapped[str] = mapped_column(String(200), unique=True)
     acknowledged_by: Mapped[str | None] = mapped_column(String(80))
     acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime)
+    pushed_at: Mapped[datetime | None] = mapped_column(DateTime)  # sent to the chat webhook
