@@ -22,6 +22,7 @@ import Admin from './pages/Admin'
 import MapPage from './pages/MapPage'
 import WeeklyBrief from './pages/WeeklyBrief'
 import SeriesPage from './pages/SeriesPage'
+import Guide from './pages/Guide'
 import { AuthProvider } from './auth'
 
 const router = createBrowserRouter([
@@ -47,6 +48,7 @@ const router = createBrowserRouter([
       { path: 'map', element: <MapPage /> },
       { path: 'weekly', element: <WeeklyBrief /> },
       { path: 'series', element: <SeriesPage /> },
+      { path: 'guide', element: <Guide /> },
     ],
   },
 ])

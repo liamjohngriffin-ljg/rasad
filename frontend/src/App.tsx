@@ -40,6 +40,7 @@ export default function App() {
           <div className="ms-auto flex items-center gap-3 text-sm">
             {status?.marking && <span className="tag">{status.marking}</span>}
             {status?.last_commit && <span className="muted whitespace-nowrap hidden lg:inline">{t('asOf')} <span className="mono">{status.last_commit}</span></span>}
+            <NavLink to="/guide" className="muted hover:text-[var(--ink)]" title={t('guide')}>?</NavLink>
             <NavLink to="/account" className="muted hover:text-[var(--ink)]">{me.display_name}</NavLink>
             <button className="btn" onClick={() => setLang(lang === 'en' ? 'ar' : 'en')}>{t('lang')}</button>
             <button className="btn" onClick={logout}>{t('signOut')}</button>

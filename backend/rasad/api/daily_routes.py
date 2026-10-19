@@ -260,6 +260,17 @@ def markdown_to_docx(md: str, *, lang: str, marking: str, title_fallback: str) -
     return buf.getvalue()
 
 
+@router.get("/guide")
+def guide(lang: str = Query("en", pattern="^(en|ar)$"), user: User = Depends(current_user)) -> dict:
+    """The analyst guide shipped with this version (Arabic falls back to English until translated)."""
+    base = os.path.join(os.path.dirname(os.path.dirname(__file__)), "docs")
+    path = os.path.join(base, f"guide_{lang}.md")
+    if not os.path.exists(path):
+        path, lang = os.path.join(base, "guide_en.md"), "en"
+    with open(path, encoding="utf-8") as f:
+        return {"lang": lang, "content_md": f.read()}
+
+
 @router.get("/briefs/weekly")
 def weekly_brief(lang: str = Query("en", pattern="^(en|ar)$"), as_of: str | None = None, days: int = 7, db: Session = Depends(get_session), user: User = Depends(current_user)) -> dict:
     from ..briefs import weekly

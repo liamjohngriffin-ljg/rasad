@@ -212,6 +212,36 @@ def parse_advisory(text: str) -> ParsedAdvisory:
     return ParsedAdvisory(advisory_no, update_no, category, d, event_type, severity, area, location, lat, lon, source_line, summary[:700])
 
 
+def amended_description(current: str, update_summary: str, update_no: int) -> str:
+    """The original narrative plus only what the update adds. An update PDF usually repeats the
+    original paragraph and marks its new text "Update 001:"; appending it whole repeats everything."""
+    base = re.split(r"\s*Update\s*0*\d+\s*:", current, maxsplit=1)[0].strip()
+    pieces = [x.strip() for x in re.split(r"Update\s*0*\d+\s*:", update_summary or "") if x.strip()]
+    new = pieces[-1] if pieces else ""
+    norm = lambda t: re.sub(r"\s+", " ", t).strip().lower()
+    if not new or norm(new) in norm(base):
+        return base
+    return f"{base} Update {update_no:03d}: {new}"
+
+
+def tidy_descriptions(db: Session) -> int:
+    """Repair stored UKMTO rows written before amended_description existed (idempotent)."""
+    n = 0
+    for ev in db.scalars(select(ThreatEvent).where(ThreatEvent.description_en.like("%Update 0%"))):
+        if not str((ev.provenance or {}).get("source", "")).startswith("UKMTO"):
+            continue
+        parts = re.split(r"\s*Update\s*0*(\d+)\s*:", ev.description_en)
+        if len(parts) < 3:
+            continue
+        last_no = int(parts[-2])
+        fixed = amended_description(parts[0], parts[-1], last_no)
+        if fixed != ev.description_en:
+            ev.description_en = fixed
+            n += 1
+    db.commit()
+    return n
+
+
 def _find_existing(db: Session, advisory_no: str) -> ThreatEvent | None:
     for ev in db.scalars(select(ThreatEvent).where(ThreatEvent.provenance["incident_no"].as_string() == advisory_no)):
         return ev
@@ -238,7 +268,7 @@ def ingest_text(db: Session, text: str, *, external_id: str, url: str | None = N
         if parsed.update_no is not None and parsed.update_no >= prev_update:
             existing.event_type = parsed.event_type
             existing.severity = max(existing.severity or 0, parsed.severity)
-            existing.description_en = (existing.description_en or "").split(" Update ")[0] + f" Update {parsed.update_no:03d}: {parsed.summary}"
+            existing.description_en = amended_description(existing.description_en or "", parsed.summary, parsed.update_no)
             if parsed.lat is not None:
                 existing.lat, existing.lon = parsed.lat, parsed.lon
             existing.provenance = {**(existing.provenance or {}), "update_no": parsed.update_no, "update_url": url or ""}

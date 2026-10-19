@@ -34,7 +34,7 @@ where = ["."]
 include = ["rasad*"]
 
 [tool.setuptools.package-data]
-rasad = ["seed/data/*.json", "pipelines/fixtures/*"]
+rasad = ["seed/data/*.json", "pipelines/fixtures/*", "docs/*.md"]
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]

@@ -39,7 +39,7 @@ a { color: inherit; text-decoration: none; }
 .prose h1 { font-size: 22px; font-weight: 600; margin: 0 0 8px; }
 .prose h2 { font-size: 16px; font-weight: 600; margin: 18px 0 6px; color: var(--accent); }
 .prose p, .prose li { margin: 4px 0; }
-.prose ul { padding-inline-start: 18px; }
+.prose ul { padding-inline-start: 18px; list-style: disc; }
 .prose em { color: var(--ink-2); }
 table.grid { width: 100%; border-collapse: collapse; }
 table.grid th, table.grid td { text-align: start; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }

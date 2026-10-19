@@ -96,6 +96,7 @@ def poll(*, backfill: bool = False) -> dict:
             _try(report, f"jmic:{url.rsplit('/', 1)[-1]}", lambda u=url: jmic.fetch_and_ingest(db, u)["week"])
         for code in cfg.get("rss") or []:
             _try(report, f"rss_{code}", lambda c=code: rss_wires.fetch_and_ingest(db, c, allow_sanctioned=bool(cfg.get("allow_sanctioned_feeds"))))
+        _try(report, "ukmto_tidy", lambda: ukmto.tidy_descriptions(db))
         _try(report, "incidents", lambda: incidents.link(db))
         _try(report, "alerts", lambda: alert_engine.after_poll(db))
     finally:

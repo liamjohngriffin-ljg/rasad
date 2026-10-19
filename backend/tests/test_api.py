@@ -181,3 +181,10 @@ def test_weekly_brief(client):
     assert "موجز الموقف الأسبوعي" in ar["content_md"]
     r = client.get("/api/briefs/weekly/docx?lang=en&as_of=2026-10-18")
     assert r.status_code == 200 and len(r.content) > 5000
+
+
+def test_guide_in_both_languages(client):
+    en = client.get("/api/guide?lang=en").json()
+    ar = client.get("/api/guide?lang=ar").json()
+    assert en["content_md"].startswith("# Analyst guide") and ar["lang"] == "ar" and "دليل المحلل" in ar["content_md"]
+    assert "—" not in en["content_md"] and "–" not in en["content_md"]
